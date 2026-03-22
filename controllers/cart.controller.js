@@ -1,4 +1,5 @@
 import { Cart } from "../models/cart.model.js";
+import { Coupon } from "../models/coupon.model.js";
 
 // add item to cart
 const addToCart = async (req, res) => {
@@ -107,7 +108,11 @@ const getMyCart = async (req, res) => {
 
     const cart = await Cart.findOne({ farmer: farmerId }).populate({
       path: "items.item",
-      select: "itemName brand unit",
+      select: "itemName brand unit sourceRef",
+      populate: {
+        path: "sourceRef",
+        select: "productImages",
+      },
     });
 
     if (!cart) {
@@ -117,11 +122,16 @@ const getMyCart = async (req, res) => {
       });
     }
 
+    cart.items = cart.items.filter((i) => i.item !== null);
+
+    await cart.save();
+
     res.status(200).json({
       success: true,
       data: cart,
     });
   } catch (error) {
+    console.error("Get cart error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -192,4 +202,84 @@ const clearCart = async (req, res) => {
   }
 };
 
-export { addToCart, updateCartItem, getMyCart, removeFromCart, clearCart };
+// apply coupon
+const applyCoupon = async (req, res) => {
+  try {
+    const { couponCode } = req.body;
+    const farmerId = req.user._id;
+
+    const cart = await Cart.findOne({ farmer: farmerId });
+
+    if (!cart || cart.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Cart is empty",
+      });
+    }
+
+    const coupon = await Coupon.findOne({
+      code: couponCode,
+      isActive: true,
+    });
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid coupon",
+      });
+    }
+
+    const today = new Date();
+
+    if (today < coupon.validFrom || today > coupon.validUntil) {
+      return res.status(400).json({
+        success: false,
+        message: "Coupon expired",
+      });
+    }
+
+    const cartTotal = cart.items.reduce(
+      (sum, i) => sum + i.quantity * i.expectedPrice,
+      0
+    );
+
+    if (cartTotal < coupon.minOrderAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimum order amount is ${coupon.minOrderAmount}`,
+      });
+    }
+
+    let discount = 0;
+
+    if (coupon.discountType === "PERCENTAGE") {
+      discount = (cartTotal * coupon.discountValue) / 100;
+
+      if (coupon.maxDiscount) {
+        discount = Math.min(discount, coupon.maxDiscount);
+      }
+    } else {
+      discount = coupon.discountValue;
+    }
+
+    cart.coupon = coupon._id;
+    cart.discountAmount = discount;
+    cart.finalAmount = cartTotal - discount;
+
+    await cart.save();
+
+    res.status(200).json({
+      success: true,
+      cartTotal,
+      discount,
+      finalAmount: cart.finalAmount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export { addToCart, updateCartItem, getMyCart, removeFromCart, clearCart, applyCoupon };

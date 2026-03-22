@@ -7,18 +7,31 @@ const purchaseSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    crop: {
+    purchaseId: {
       type: String,
       required: true,
+      unique: true,
     },
-    rate: {
-      type: Number,
-      required: true,
-    },
-    quantity: {
-      type: Number,
-      required: true,
-    },
+    crops: [
+      {
+        cropName: {
+          type: String,
+          required: true,
+        },
+        variety: {
+          type: String,
+          required: false,
+        },
+        rate: {
+          type: Number,
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+        },
+      }
+    ],
     procurementDate: {
       type: Date,
       required: true,
@@ -42,6 +55,15 @@ const purchaseSchema = new mongoose.Schema(
       required: false,
       default: null,
     },
+    totalAmount: {
+      type: Number,
+      required: true
+    },
+    previousDues: {
+      type: Number,
+      required: false,
+      default: 0
+    }
   },
   { timestamps: true }
 );

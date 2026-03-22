@@ -2,37 +2,72 @@ import { InventoryStock } from "../models/inventory.model.js";
 
 const getMarketplaceItems = async (req, res) => {
   try {
-    const stockItems = await InventoryStock.find({
-      availableQuantity: { $gt: 0 },
-    })
-      .populate({
-        path: "item",
-        select: "itemName brand unit purchasePrice isActive sourceRef",
-        populate: {
-          path: "sourceRef",
-          select: "productImage",
+    const items = await InventoryStock.aggregate([
+      {
+        $match: {
+          availableQuantity: { $gt: 0 },
         },
-      });
+      },
 
-    const response = stockItems
-      .filter((s) => s.item.isActive)
-      .map((s) => ({
-        itemId: s.item._id,
-        itemName: s.item.itemName,
-        brand: s.item.brand,
-        unit: s.item.unit,
-        availableQuantity: s.availableQuantity,
+      {
+        $lookup: {
+          from: "inventoryitems",
+          localField: "item",
+          foreignField: "_id",
+          as: "item",
+        },
+      },
 
-        // price logic
-        price: s.lastSellRate ?? s.item.purchasePrice ?? null,
+      { $unwind: "$item" },
 
-        // product image from Product
-        productImage: s.item.sourceRef?.productImage ?? null,
-      }));
+      {
+        $match: {
+          "item.isActive": true,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "products",
+          localField: "item.sourceRef",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+
+      { $unwind: "$product" },
+
+      {
+        $project: {
+          _id: 0,
+          itemId: "$item._id",
+          itemName: "$item.itemName",
+          brand: "$item.brand",
+          unit: "$item.unit",
+          availableQuantity: 1,
+
+          price: {
+            $ifNull: ["$lastSellRate", "$item.purchasePrice"],
+          },
+
+          expiryDate: "$item.expiryDate",
+
+          // return ALL product images
+          productImages: {
+            $ifNull: ["$product.productImages.url", []],
+          },
+        },
+      },
+
+      {
+        $sort: { itemName: 1 },
+      },
+    ]);
 
     res.status(200).json({
       success: true,
-      data: response,
+      count: items.length,
+      data: items,
     });
   } catch (error) {
     console.error("Marketplace error:", error);

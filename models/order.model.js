@@ -2,11 +2,16 @@ import mongoose from "mongoose";
 
 const OrderSchema = new mongoose.Schema(
   {
+    orderId: {
+      type: String,
+      unique: true,
+      required: true
+    },
     farmer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-    }, // Farmer
+    },
     items: [
       {
         item: {
@@ -22,8 +27,8 @@ const OrderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
-      default: "pending",
+      enum: ["PENDING", "APPROVED", "REJECTED", "SOLD"],
+      default: "PENDING",
     },
 
     remarks: String,
@@ -34,8 +39,40 @@ const OrderSchema = new mongoose.Schema(
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     }, // FPO / Staff
+
+    coupon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null
+    },
+
+    discountAmount: {
+      type: Number,
+      default: 0
+    },
+
+    finalAmount: {
+      type: Number,
+      default: 0
+    },
+
+    paymentMethod: {
+      type: String,
+      enum: ["CASH", "CREDIT"],
+      default: "CASH",
+      required: true
+    },
+
+    creditDays: {
+      type: Number,
+      default: 0
+    },
+
+    dueDate: {
+      type: Date,
+      default: null
+    },
   },
   { timestamps: true }
 );

@@ -104,7 +104,7 @@ const verifyOtp = async (req, res) => {
 
     // Fetch user
     let user = await User.findOne({ phone: mobile });
-    
+
     if (!user) {
       // Create new user with minimal info
       if (role === "Farmer") {

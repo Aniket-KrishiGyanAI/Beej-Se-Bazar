@@ -10,7 +10,7 @@ const saveReport = async (req, res) => {
     if (!diagnosis) {
       return res
         .status(400)
-        .json({ status: "error", message: "Diagnosis is required" }); 
+        .json({ status: "error", message: "Diagnosis is required" });
     }
 
     let imagePath = null;

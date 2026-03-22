@@ -16,31 +16,36 @@ const ProductSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    mrp: {
-      type: Number,
-      required: true,
-    },
-    quantity: {
-      type: Number,
-      required: true,
-    },
-    unit: {
-      type: String,
-      required: true,
-    },
-    purchaseDate: {
-      type: Date,
-      required: true,
-    },
-    expiryDate: {
-      type: Date,
-      required: false,
-      default: null,
-    },
-    productImage: {
-      type: s3FileSchema,
-      default: null,
-    },
+    products: [
+      {
+        mrp: {
+          type: Number,
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+        },
+        unit: {
+          type: String,
+          required: true,
+        },
+        parameter: {
+          type: String, // Lt. - 1/2/5/10 or Kg - 250/500/1000
+          required: true,
+        },
+        purchaseDate: {
+          type: Date,
+          required: true,
+        },
+        expiryDate: {
+          type: Date,
+          required: false,
+          default: null,
+        },
+      }
+    ],
+    productImages: [s3FileSchema],
     isActive: {
       type: Boolean,
       default: true,

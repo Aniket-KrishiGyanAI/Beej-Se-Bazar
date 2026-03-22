@@ -187,10 +187,38 @@ const deleteFarmById = async (req, res) => {
   }
 };
 
+// get all farms
+const getAllFarms = async (req,res) => {
+  try {
+    if (req.user.role !== "FPO" && req.user.role !== "Staff") {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Only admins can get data of farms",
+      });
+    }
+
+    const farms = await Farm.find().populate("userId", "firstName lastName phone").sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "Farms fetched successfully",
+      count: farms.length,
+      data: farms,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error while getting farms",
+      error: err.message,
+    });
+  }
+}
+
 export {
   addFarm,
   getFarmsByUserId,
   getFarmById,
   updateFarmById,
   deleteFarmById,
+  getAllFarms
 };

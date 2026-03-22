@@ -40,6 +40,17 @@ const InventoryItemSchema = new mongoose.Schema(
       required: true,
     },
 
+    parameter: {
+      type: String,
+      required: true
+    },
+
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      index: true
+    },
+
     expiryDate: {
       type: Date,
       default: null,
@@ -54,7 +65,10 @@ const InventoryItemSchema = new mongoose.Schema(
 );
 
 // Prevent duplicate items
-InventoryItemSchema.index({ itemName: 1, brand: 1, unit: 1 }, { unique: true });
+InventoryItemSchema.index(
+  { sourceRef: 1, variantId: 1 },
+  { unique: true }
+);
 
 export const InventoryItem = mongoose.model(
   "InventoryItem",

@@ -6,23 +6,36 @@ import { uploadToS3 } from "../utils/s3Upload.js";
 // add product
 const addProduct = async (req, res) => {
   try {
-    const {
+    let {
       productName,
       description,
       brand,
-      mrp,
-      quantity,
-      unit,
-      purchaseDate,
-      expiryDate,
+      products,
+      productImages,
     } = req.body;
 
-    const userId = req.user._id;
+    // parsing the product
+    if (typeof products === "string") {
+      products = JSON.parse(products);
+    }
 
-    if (!productName || !brand || !mrp || !quantity || !unit || !purchaseDate) {
+    if (!productName || !brand || !products || !Array.isArray(products) || products.length === 0) {
       return res.status(400).json({
         success: false,
         message: "All required fields must be filled",
+      });
+    }
+
+    const userId = req.user._id;
+
+    // must have at least one image
+    if (
+      (!req.files || req.files.length === 0) &&
+      (!Array.isArray(productImages) || productImages.length === 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one product image is required",
       });
     }
 
@@ -33,82 +46,119 @@ const addProduct = async (req, res) => {
       });
     }
 
-    let uploadedProductImage = null;
+    const uploadedImages = [];
 
-    if (req.body.productImage?.startsWith("data:")) {
-      try {
-        const base64Data = req.body.productImage.split(",")[1];
-        const mimeType = req.body.productImage.split(";")[0].split(":")[1];
+    // MULTIPLE BASE64 IMAGES
+    if (Array.isArray(productImages)) {
+      for (const base64Image of productImages) {
+        if (!base64Image.startsWith("data:")) continue;
+
+        const base64Data = base64Image.split(",")[1];
+        const mimeType = base64Image.split(";")[0].split(":")[1];
+        const extension = mimeType.split("/")[1];
+
         const buffer = Buffer.from(base64Data, "base64");
 
         const mockFile = {
           buffer,
-          originalname: `product_${Date.now()}`,
+          originalname: `product_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}.${extension}`,
           mimetype: mimeType,
           size: buffer.length,
-          fieldname: "productImage",
+          fieldname: "productImages",
         };
 
-        uploadedProductImage = await uploadToS3(mockFile, userId);
-      } catch (err) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid base64 image data",
-        });
+        const uploaded = await uploadToS3(mockFile, req.user._id);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        uploadedImages.push(uploaded);
       }
-    } else if (req.file) {
-      uploadedProductImage = await uploadToS3(req.file, userId);
+    }
+
+    // MULTIPLE FORM-DATA FILES
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const uploaded = await uploadToS3(file, req.user._id);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        uploadedImages.push(uploaded);
+      }
+    }
+
+    // duplicate variant check
+    if (Array.isArray(products) && products.length > 0) {
+      const seenVariants = new Set();
+
+      for (const variant of products) {
+        const { parameter, unit } = variant;
+
+        const key = `${parameter}-${unit}`;
+
+        if (seenVariants.has(key)) {
+          return res.status(400).json({
+            success: false,
+            message: `Duplicate variant detected: ${parameter}${unit}`,
+          });
+        }
+
+        seenVariants.add(key);
+      }
     }
 
     const product = await Product.create({
       productName,
       description,
       brand,
-      mrp,
-      quantity,
-      unit,
-      purchaseDate,
-      expiryDate,
-      productImage: uploadedProductImage,
+      products,
+      productImages: uploadedImages,
     });
 
     // Inventory handling (ADD STOCK)
-    let inventoryItem = await InventoryItem.findOne({
-      itemName: productName,
-      brand,
-      unit,
-    });
+    for (const variant of product.products) {
 
-    if (!inventoryItem) {
-      inventoryItem = await InventoryItem.create({
-        sourceType: "PRODUCT",
+      let inventoryItem = await InventoryItem.findOne({
         sourceRef: product._id,
-        itemName: productName,
-        brand,
-        unit,
-        expiryDate: expiryDate || null,
-        purchasePrice: mrp,
+        variantId: variant._id
       });
-    } else {
-      inventoryItem.purchasePrice = mrp;
-      await inventoryItem.save();
-    }
 
-    let inventoryStock = await InventoryStock.findOne({
-      item: inventoryItem._id,
-    });
+      if (!inventoryItem) {
+        inventoryItem = await InventoryItem.create({
+          sourceType: "PRODUCT",
+          sourceRef: product._id,
+          variantId: variant._id,
+          itemName: `${product.productName.trim()} ${variant.parameter}${variant.unit}`,
+          brand: product.brand.trim(),
+          unit: variant.unit,
+          parameter: variant.parameter,
+          expiryDate: variant.expiryDate || null,
+          purchasePrice: variant.mrp
+        });
+      }
 
-    if (!inventoryStock) {
-      inventoryStock = await InventoryStock.create({
+      let inventoryStock = await InventoryStock.findOne({
         item: inventoryItem._id,
-        availableQuantity: quantity,
-        lastUpdatedBy: req.user._id,
       });
-    } else {
-      inventoryStock.availableQuantity += quantity;
-      inventoryStock.lastUpdatedBy = req.user._id;
-      inventoryStock.lastUpdatedAt = new Date();
-      await inventoryStock.save();
+
+      if (!inventoryStock) {
+        await InventoryStock.create({
+          item: inventoryItem._id,
+          availableQuantity: variant.quantity,
+          lastUpdatedBy: userId,
+        });
+      } else {
+        inventoryStock.availableQuantity += variant.quantity;
+        inventoryStock.lastUpdatedBy = userId;
+        inventoryStock.lastUpdatedAt = new Date();
+
+        await inventoryStock.save();
+      }
     }
 
     return res.status(201).json({
@@ -129,38 +179,13 @@ const addProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-
     const userId = req.user._id;
 
-    const {
-      productName,
-      description,
-      brand,
-      mrp,
-      quantity,
-      unit,
-      purchaseDate,
-      expiryDate,
-    } = req.body;
+    let { productName, description, brand, products, productImages } = req.body;
 
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
+    if (typeof products === "string") {
+      products = JSON.parse(products);
     }
-
-    const updatedData = {};
-
-    if (productName) updatedData.productName = productName;
-    if (description) updatedData.description = description;
-    if (brand) updatedData.brand = brand;
-    if (mrp) updatedData.mrp = mrp;
-    if (quantity) updatedData.quantity = quantity;
-    if (unit) updatedData.unit = unit;
-    if (purchaseDate) updatedData.purchaseDate = purchaseDate;
-    if (expiryDate) updatedData.expiryDate = expiryDate;
 
     if (req.user.role !== "FPO" && req.user.role !== "Staff") {
       return res.status(403).json({
@@ -169,40 +194,6 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    if (req.body.productImage?.startsWith("data:")) {
-      const base64Data = req.body.productImage.split(",")[1];
-      const mimeType = req.body.productImage.split(";")[0].split(":")[1];
-
-      const buffer = Buffer.from(base64Data, "base64");
-
-      const mockFile = {
-        buffer,
-        originalname: `product_${Date.now()}`,
-        mimetype: mimeType,
-        size: buffer.length,
-        fieldname: "productImage",
-      };
-
-      const uploaded = await uploadToS3(mockFile, userId);
-
-      // Delete old image from S3
-      if (product.productImage?.key) {
-        await deleteFromS3(product.productImage.key);
-      }
-
-      updatedData.productImage = uploaded;
-    } else if (req.file) {
-      const uploaded = await uploadToS3(req.file, userId);
-
-      // Delete old image from S3
-      if (product.productImage?.key) {
-        await deleteFromS3(product.productImage.key);
-      }
-
-      updatedData.productImage = uploaded;
-    }
-
-    //! Inventory adjustment logic - check existing purchase (product)
     const existingProduct = await Product.findById(id);
     if (!existingProduct) {
       return res.status(404).json({
@@ -211,44 +202,162 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    // update the product
+    // Duplicate variant check
+    if (Array.isArray(products)) {
+      const seenVariants = new Set();
+
+      for (const variant of products) {
+        const key = `${variant.parameter}-${variant.unit}`;
+
+        if (seenVariants.has(key)) {
+          return res.status(400).json({
+            success: false,
+            message: `Duplicate variant detected: ${variant.parameter}${variant.unit}`,
+          });
+        }
+
+        seenVariants.add(key);
+      }
+    }
+
+    // Preserve existing variant _id
+    if (Array.isArray(products)) {
+      for (const variant of products) {
+        const existingVariant = existingProduct.products.find(
+          (v) =>
+            v.parameter === variant.parameter &&
+            v.unit === variant.unit
+        );
+
+        if (existingVariant) {
+          variant._id = existingVariant._id;
+        }
+      }
+    }
+
+    const updatedData = {};
+
+    if (productName) updatedData.productName = productName;
+    if (description) updatedData.description = description;
+    if (brand) updatedData.brand = brand;
+
+    if (Array.isArray(products)) {
+      updatedData.products = products;
+    }
+
+    const uploadedImages = [];
+
+    if (Array.isArray(productImages)) {
+      for (const base64Image of productImages) {
+        if (!base64Image?.startsWith("data:")) continue;
+
+        const base64Data = base64Image.split(",")[1];
+        const mimeType = base64Image.split(";")[0].split(":")[1];
+        const extension = mimeType.split("/")[1];
+
+        const buffer = Buffer.from(base64Data, "base64");
+
+        const mockFile = {
+          buffer,
+          originalname: `product_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}.${extension}`,
+          mimetype: mimeType,
+          size: buffer.length,
+          fieldname: "productImages",
+        };
+
+        const uploaded = await uploadToS3(mockFile, userId);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        uploadedImages.push(uploaded);
+      }
+    }
+
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const uploaded = await uploadToS3(file, userId);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        uploadedImages.push(uploaded);
+      }
+    }
+
+    if (uploadedImages.length > 0) {
+      for (const img of existingProduct.productImages || []) {
+        if (img?.key) {
+          await deleteFromS3(img.key);
+        }
+      }
+
+      updatedData.productImages = uploadedImages;
+    }
+
     const updatedProduct = await Product.findByIdAndUpdate(id, updatedData, {
       new: true,
     });
 
-    if (!updatedProduct) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
-    }
+    if (Array.isArray(products)) {
+      for (const variant of products) {
 
-    //! Inventory adjustment logic - stock management
-    if (quantity !== undefined) {
-      const inventoryItem = await InventoryItem.findOne({
-        itemName: existingProduct.productName,
-        brand: existingProduct.brand,
-        unit: existingProduct.unit,
-        purchasePrice: existingProduct.mrp,
-      });
-
-      if (inventoryItem) {
-        const inventoryStock = await InventoryStock.findOne({
-          item: inventoryItem._id,
+        let inventoryItem = await InventoryItem.findOne({
+          sourceRef: updatedProduct._id,
+          variantId: variant._id
         });
 
-        if (inventoryStock) {
-          const quantityDiff = quantity - existingProduct.quantity;
+        if (!inventoryItem) {
+          inventoryItem = await InventoryItem.create({
+            sourceType: "PRODUCT",
+            sourceRef: updatedProduct._id,
+            variantId: variant._id,
+            itemName: `${updatedProduct.productName.trim()} ${variant.parameter}${variant.unit}`,
+            brand: updatedProduct.brand.trim(),
+            unit: variant.unit,
+            parameter: variant.parameter,
+            expiryDate: variant.expiryDate || null,
+            purchasePrice: variant.mrp
+          });
+        } else {
+          inventoryItem.purchasePrice = variant.mrp;
+          inventoryItem.expiryDate = variant.expiryDate || null;
+          await inventoryItem.save();
+        }
 
-          inventoryStock.availableQuantity += quantityDiff;
-          inventoryStock.lastUpdatedBy = req.user._id;
+        let inventoryStock = await InventoryStock.findOne({
+          item: inventoryItem._id
+        });
+
+        if (!inventoryStock) {
+          await InventoryStock.create({
+            item: inventoryItem._id,
+            availableQuantity: variant.quantity,
+            lastUpdatedBy: userId
+          });
+        } else {
+          inventoryStock.availableQuantity = variant.quantity;
+          inventoryStock.lastUpdatedBy = userId;
           inventoryStock.lastUpdatedAt = new Date();
-
-          if (inventoryStock.availableQuantity < 0) {
-            throw new Error("Inventory quantity cannot be negative");
-          }
-
           await inventoryStock.save();
+        }
+      }
+
+      // Remove inventory for deleted variants
+      const variantIds = products.map(v => v._id.toString());
+
+      const inventoryItems = await InventoryItem.find({
+        sourceRef: updatedProduct._id
+      });
+
+      for (const item of inventoryItems) {
+        if (!variantIds.includes(item.variantId.toString())) {
+          await InventoryStock.deleteOne({ item: item._id });
+          await InventoryItem.deleteOne({ _id: item._id });
         }
       }
     }
@@ -391,6 +500,86 @@ const toggleProductStatus = async (req, res) => {
   }
 };
 
+const getExpiryDashboard = async (req, res) => {
+  try {
+    const today = new Date();
+
+    const in30Days = new Date();
+    in30Days.setDate(in30Days.getDate() + 30);
+
+    const in60Days = new Date();
+    in60Days.setDate(in60Days.getDate() + 60);
+
+    const result = await Product.aggregate([
+      { $match: { isActive: true } },
+
+      { $unwind: "$products" },
+
+      {
+        $addFields: {
+          daysLeft: {
+            $divide: [
+              { $subtract: ["$products.expiryDate", today] },
+              1000 * 60 * 60 * 24
+            ]
+          }
+        }
+      },
+
+      {
+        $match: {
+          "products.expiryDate": { $ne: null }
+        }
+      },
+
+      {
+        $project: {
+          productId: "$_id",
+          productName: 1,
+          brand: 1,
+          parameter: "$products.parameter",
+          unit: "$products.unit",
+          mrp: "$products.mrp",
+          expiryDate: "$products.expiryDate",
+          purchaseDate: "$products.purchaseDate",
+          daysLeft: { $round: ["$daysLeft", 0] }
+        }
+      },
+
+      {
+        $facet: {
+          expired: [
+            { $match: { expiryDate: { $lt: today } } },
+            { $sort: { expiryDate: 1 } }
+          ],
+
+          expiringIn30Days: [
+            { $match: { expiryDate: { $gte: today, $lte: in30Days } } },
+            { $sort: { expiryDate: 1 } }
+          ],
+
+          expiringIn60Days: [
+            { $match: { expiryDate: { $gt: in30Days, $lte: in60Days } } },
+            { $sort: { expiryDate: 1 } }
+          ]
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: result[0]
+    });
+
+  } catch (error) {
+    console.error("Expiry dashboard error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch expiry dashboard"
+    });
+  }
+};
+
 export {
   addProduct,
   updateProduct,
@@ -398,4 +587,5 @@ export {
   getProductById,
   deleteProduct,
   toggleProductStatus,
+  getExpiryDashboard
 };

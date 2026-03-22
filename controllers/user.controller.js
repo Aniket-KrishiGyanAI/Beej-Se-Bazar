@@ -26,6 +26,13 @@ const registerUser = async (req, res) => {
       });
     }
 
+    if(phone && !/^\d{10}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid phone number format",
+      });
+    }
+
     const existingUser = await User.findOne({ phone });
     if (existingUser) {
       return res.status(409).json({
@@ -40,28 +47,6 @@ const registerUser = async (req, res) => {
 
     //! FARMER REGISTRATION
     if (role === "Farmer") {
-      const {
-        farmerCategory,
-        cropsGrown,
-        landDetails,
-        bankName,
-        ifscCode,
-        accountNumber,
-      } = req.body;
-
-      if (
-        !farmerCategory ||
-        !Array.isArray(cropsGrown) ||
-        !cropsGrown.length ||
-        !Array.isArray(landDetails) ||
-        !landDetails.length
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Farmer specific fields are required",
-        });
-      }
-
       user = await Farmer.create({
         firstName,
         lastName,
@@ -71,41 +56,7 @@ const registerUser = async (req, res) => {
         village,
         district,
         state,
-        farmerCategory,
-        cropsGrown,
-        landDetails,
-        bankName,
-        ifscCode,
-        accountNumber,
       });
-
-      const updateData = {};
-      if (req.files?.soilHealthCard?.length) {
-        updateData.soilHealthCard = await uploadToS3(
-          req.files.soilHealthCard[0],
-          user._id,
-        );
-      }
-      if (req.files?.labReport?.length) {
-        updateData.labReport = await uploadToS3(
-          req.files.labReport[0],
-          user._id,
-        );
-      }
-      if (req.files?.govtSchemeDocs?.length) {
-        updateData.govtSchemeDocs = await Promise.all(
-          req.files.govtSchemeDocs.map((file) => uploadToS3(file, user._id)),
-        );
-      }
-
-      // Update user with files
-      if (Object.keys(updateData).length) {
-        user = await Farmer.findByIdAndUpdate(
-          user._id,
-          { $set: updateData },
-          { new: true },
-        );
-      }
     }
 
     //! STAFF REGISTRATION
