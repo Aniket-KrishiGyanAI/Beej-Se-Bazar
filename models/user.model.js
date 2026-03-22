@@ -58,29 +58,29 @@ const userSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
-      required: true,
+      // required: true,
       trim: true,
     },
     lastName: {
       type: String,
-      required: true,
+      // required: true,
       trim: true,
     },
     phone: {
       type: String,
-      required: true,
+      // required: true,
       unique: true,
     },
 
     gender: {
       type: String,
       enum: ["male", "female", "other"],
-      required: true,
+      // required: true,
     },
 
     password: {
       type: String,
-      required: true,
+      // required: true,
       minlength: 6,
     },
 
@@ -107,7 +107,7 @@ const farmerSchema = new mongoose.Schema({
   farmerCategory: {
     type: String,
     enum: ["small", "marginal", "medium"],
-    required: true,
+    // required: true,
   },
 
   // emailId: { type: String, default: null },
@@ -150,12 +150,12 @@ export const Farmer = User.discriminator("Farmer", farmerSchema);
 const staffSchema = new mongoose.Schema({
   emailId: {
     type: String,
-    required: true,
+    // required: true,
     unique: true,
   },
   joiningDate: {
     type: Date,
-    required: true,
+    // required: true,
   },
 });
 
@@ -165,15 +165,15 @@ export const Staff = User.discriminator("Staff", staffSchema);
 const fpoSchema = new mongoose.Schema({
   gstNumber: {
     type: String,
-    required: true,
+    // required: true,
   },
   shopName: {
     type: String,
-    required: true,
+    // required: true,
   },
   emailId: {
     type: String,
-    required: true,
+    // required: true,
     unique: true,
   },
 });

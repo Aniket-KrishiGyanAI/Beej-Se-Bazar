@@ -1,5 +1,5 @@
 import { Otp } from "../models/otp.model.js";
-import { User } from "../models/user.model.js";
+import { Farmer, FPO, Staff, User } from "../models/user.model.js";
 import { generateOtp, hashOtp, compareOtp } from "../utils/otp.js";
 import { sendSms } from "../utils/sendSms.js";
 import jwt from "jsonwebtoken";
@@ -16,16 +16,10 @@ const isTestAccount = (mobile) => TEST_ACCOUNTS[mobile] ?? null;
 // send the otp
 const sendOtp = async (req, res) => {
   try {
-    const { mobile } = req.body;
+    const { mobile, role } = req.body;
 
-    if (!mobile) {
-      return res.status(400).json({ success: false, message: "Mobile number is required" });
-    }
-
-    // Check if user exists
-    const user = await User.findOne({ phone: mobile });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+    if (!mobile || !role) {
+      return res.status(400).json({ success: false, message: "Mobile number and role are required" });
     }
 
     // Handle Test Accounts
@@ -69,10 +63,10 @@ const sendOtp = async (req, res) => {
 // verify the otp
 const verifyOtp = async (req, res) => {
   try {
-    const { mobile, otp } = req.body;
+    const { mobile, otp, role } = req.body;
 
-    if (!mobile || !otp) {
-      return res.status(400).json({ success: false, message: "Mobile and OTP are required" });
+    if (!mobile || !otp || !role) {
+      return res.status(400).json({ success: false, message: "Mobile, OTP, and role are required" });
     }
 
     const record = await Otp.findOne({ mobile });
@@ -109,9 +103,22 @@ const verifyOtp = async (req, res) => {
     await Otp.deleteOne({ mobile });
 
     // Fetch user
-    const user = await User.findOne({ phone: mobile });
+    let user = await User.findOne({ phone: mobile });
+    
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      // Create new user with minimal info
+      if (role === "Farmer") {
+        user = await Farmer.create({ phone: mobile });
+      } else if (role === "Staff") {
+        user = await Staff.create({ phone: mobile });
+      } else if (role === "FPO") {
+        user = await FPO.create({ phone: mobile });
+      }
+    } else {
+      // Check if role matches
+      if (user.role !== role) {
+        return res.status(400).json({ success: false, message: "Role does not match with registered user" });
+      }
     }
 
     // Generate JWT
