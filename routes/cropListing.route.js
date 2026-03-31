@@ -6,6 +6,7 @@ import {
   getCropListings,
   getCropListingsByUser,
   updateCropListing,
+  getCropListingReceipt,
 } from "../controllers/cropListing.controller.js";
 import { upload } from "../middlewares/multer.js";
 import { protect } from "../middlewares/auth.js";
@@ -23,5 +24,6 @@ router.delete("/delete/:id", protect, deleteCropListing);
 router.get("/getListings", getCropListings);
 router.get("/getListingsByUser", protect, getCropListingsByUser);
 router.get("/getCropByCropId/:id", getCropByCropId);
+router.get("/receipt/:id", protect, getCropListingReceipt);
 
 export default router;

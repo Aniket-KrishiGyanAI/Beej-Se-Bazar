@@ -1,5 +1,5 @@
 import express from "express";
-import { downloadReceipt, generateReceipt, getAllOrders, getAllReceipts, getReceiptById, getUserSpecificOrders, placeOrder, updateOrderStatus } from "../controllers/order.controller.js";
+import { downloadReceipt, generateReceipt, getAllOrders, getAllReceipts, getReceiptById, getUserSpecificOrders, placeOrder, updateOrderPrices, updateOrderStatus } from "../controllers/order.controller.js";
 
 import { protect } from "../middlewares/auth.js";
 
@@ -13,5 +13,6 @@ router.post("/generateReceipt/:id", protect, generateReceipt);
 router.get("/receipt/:id", protect, getReceiptById);
 router.get("/downloadReceipt/:id", protect, downloadReceipt);
 router.get("/allReceipts", protect, getAllReceipts);
+router.patch("/:id/update-prices", protect, updateOrderPrices);
 
 export default router;

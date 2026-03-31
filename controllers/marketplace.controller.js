@@ -56,6 +56,15 @@ const getMarketplaceItems = async (req, res) => {
           productImages: {
             $ifNull: ["$product.productImages.url", []],
           },
+
+          // Newly added fields from product
+          description: "$product.description",
+          productCategory: "$product.productCategory",
+          productVideos: { $ifNull: ["$product.productVideos", []] },
+          targetCrops: { $ifNull: ["$product.targetCrops", []] },
+          productTechnicalDetails: "$product.productTechnicalDetails",
+          howToUse: "$product.howToUse",
+          productBenefits: "$product.productBenefits",
         },
       },
 

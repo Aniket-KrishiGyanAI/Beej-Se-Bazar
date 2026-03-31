@@ -24,6 +24,10 @@ router.put(
     { name: "soilHealthCard", maxCount: 1 },
     { name: "labReport", maxCount: 1 },
     { name: "govtSchemeDocs", maxCount: 3 },
+    { name: "seedLicense", maxCount: 1 },
+    { name: "fertilizerLicense", maxCount: 1 },
+    { name: "procurementLicense", maxCount: 1 },
+    { name: "GSTCertificate", maxCount: 1 },
   ]),
   updateProfile
 );

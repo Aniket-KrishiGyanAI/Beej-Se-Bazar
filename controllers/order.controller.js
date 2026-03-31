@@ -8,6 +8,7 @@ import { sendToTokens } from "../utils/notificationService.js";
 import PDFDocument from "pdfkit";
 import { InventoryStock } from "../models/inventory.model.js";
 import { Counter } from "../models/counter.model.js";
+import path from "path";
 
 const now = new Date();
 
@@ -261,18 +262,33 @@ const updateOrderStatus = async (req, res) => {
 
       const receiptNumber = `RCPT-${Date.now()}`;
 
+      const receiptItems = order.items.map(i => {
+        const price = i.finalPrice ?? i.expectedPrice;
+
+        if (price <= 0) {
+          throw new Error(`Invalid price for ${i.item.itemName}`);
+        }
+
+        return {
+          itemName: i.item.itemName,
+          quantity: i.quantity,
+          price,
+          amount: price * i.quantity
+        };
+      });
+
+      const totalAmount = receiptItems.reduce(
+        (sum, i) => sum + i.amount,
+        0
+      );
+
       receipt = await Receipt.create([{
         receiptNumber,
         order: order._id,
         farmer: order.farmer,
-        items: order.items.map(i => ({
-          itemName: i.item.itemName,
-          quantity: i.quantity,
-          price: i.expectedPrice,
-          amount: i.expectedPrice * i.quantity
-        })),
+        items: receiptItems,
         discountAmount: order.discountAmount,
-        finalAmount: order.finalAmount,
+        finalAmount: totalAmount,
         paymentMethod: order.paymentMethod,
         creditDays: creditDays || 0,
         dueDate,
@@ -467,6 +483,7 @@ const getAllReceipts = async (req, res) => {
 
 const generateReceiptPDF = (receipt, res) => {
   const doc = new PDFDocument({ margin: 40 });
+  doc.font(path.join(process.cwd(), "fonts/NotoSansDevanagari.ttf"));
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
@@ -479,7 +496,7 @@ const generateReceiptPDF = (receipt, res) => {
   // HEADER
   doc
     .fontSize(18)
-    .text("Beej Se Bazar", { align: "center" })
+    .text("KISSAN PARIVAR", { align: "center" })
     .fontSize(14)
     .text("SALES RECEIPT", { align: "center" })
     .moveDown();
@@ -589,7 +606,7 @@ const downloadReceipt = async (req, res) => {
 
     const { id } = req.params;
 
-    if (req.user.role !== "FPO" && req.user.role !== "Staff") {
+    if (req.user.role !== "FPO" && req.user.role !== "Staff" && req.user.role !== "Farmer") {
       return res.status(403).json({
         success: false,
         message: "Unauthorized: Only admins can download receipts",
@@ -618,4 +635,62 @@ const downloadReceipt = async (req, res) => {
   }
 };
 
-export { placeOrder, getAllOrders, updateOrderStatus, getUserSpecificOrders, generateReceipt, getReceiptById, downloadReceipt, getAllReceipts };
+const updateOrderPrices = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body;
+
+    if (req.user.role !== "FPO") {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const order = await Order.findById(id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // update only provided items
+    for (const updatedItem of items) {
+      const orderItem = order.items.find(
+        (i) => i.item.toString() === updatedItem.itemId
+      );
+
+      if (orderItem) {
+        if (updatedItem.finalPrice <= 0) {
+          throw new Error("Invalid price - price must be greater than 0");
+        }
+
+        if (updatedItem.finalPrice >= orderItem.item.expectedPrice) {
+          throw new Error(
+            `Invalid price - final price (${updatedItem.finalPrice}) must be less than MRP (${orderItem.item.expectedPrice}) for ${orderItem.item.itemName}`
+          );
+        }
+
+        orderItem.finalPrice = updatedItem.finalPrice;
+      }
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Prices updated successfully",
+      data: order,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export { placeOrder, getAllOrders, updateOrderStatus, getUserSpecificOrders, generateReceipt, getReceiptById, downloadReceipt, getAllReceipts, updateOrderPrices };

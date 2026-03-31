@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { s3FileSchema } from "./S3_file_upload.model.js";
 
 const cropDoctorSchema = new mongoose.Schema(
   {
@@ -7,10 +8,7 @@ const cropDoctorSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    image: {
-      type: String,
-      default: null,
-    },
+    image: s3FileSchema,
     diagnosis: {
       type: String,
       required: true,

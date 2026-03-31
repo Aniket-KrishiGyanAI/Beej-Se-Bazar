@@ -16,6 +16,31 @@ const ProductSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    productCategory: {
+      type: String,
+      required: true,
+      index: true,
+    },
+    productVideos: [s3FileSchema],
+    targetCrops: [
+      {
+        type: String,
+      }],
+    productTechnicalDetails: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    howToUse: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    productBenefits: {
+      type: String,
+      required: false,
+      default: null,
+    },
     products: [
       {
         mrp: {

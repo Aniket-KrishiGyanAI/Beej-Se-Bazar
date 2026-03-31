@@ -3,6 +3,7 @@ import { Purchase } from "../models/purchase.model.js";
 import { Ledger } from "../models/ledger.model.js";
 import { Receipt } from "../models/receipt.model.js";
 import PDFDocument from "pdfkit";
+import path from "path";
 
 const generatePurchaseId = async () => {
   const count = await Purchase.countDocuments();
@@ -13,6 +14,22 @@ const generatePurchaseId = async () => {
 
   return `PR-${year}-${sequence}`;
 };
+
+// Format date and time in IST
+const istOptions = {
+  timeZone: 'Asia/Kolkata',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: true
+};
+
+function getISTDateTime(timestamp) {
+  return timestamp.toLocaleString('en-IN', istOptions);
+}
 
 // add purchase record
 const addPurchase = async (req, res) => {
@@ -354,6 +371,8 @@ const generateProcurementReceiptPDF = (purchase, farmer, res) => {
 
   const doc = new PDFDocument({ margin: 40 });
 
+  doc.font(path.join(process.cwd(), "fonts/NotoSansDevanagari.ttf"));
+
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
@@ -365,7 +384,7 @@ const generateProcurementReceiptPDF = (purchase, farmer, res) => {
   // HEADER
   doc
     .fontSize(18)
-    .text("Beej Se Bazar", { align: "center" })
+    .text("KISSAN PARIVAR", { align: "center" })
     .fontSize(14)
     .text("PROCUREMENT RECEIPT", { align: "center" })
     .moveDown();
@@ -376,7 +395,7 @@ const generateProcurementReceiptPDF = (purchase, farmer, res) => {
   doc
     .fontSize(11)
     .text(`Receipt ID: ${purchase.purchaseId}`)
-    .text(`Date: ${new Date(purchase.procurementDate).toLocaleDateString()}`)
+    .text(`Date: ${getISTDateTime(purchase.procurementDate)}`)
     .moveDown();
 
   // FARMER INFO

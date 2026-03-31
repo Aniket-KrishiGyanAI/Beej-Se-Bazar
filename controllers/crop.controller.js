@@ -1,5 +1,8 @@
 import { Crop } from "../models/crop.model.js";
+import { CropCalendar } from "../models/cropCalendar.model.js";
 import { Farm } from "../models/farm.model.js";
+import { generateCropData } from "../utils/cropCalenderData.js";
+import { mapStagesToDates } from "../utils/dateMapper.js";
 
 // add user crop
 const addCrop = async (req, res) => {
@@ -300,4 +303,91 @@ Available: ${availableAcre.toFixed(2)} Acre`,
   }
 };
 
-export { addCrop, deleteCropById, getCropsByUserId, updateCropById };
+const getUserCropCalendar = async (req, res) => {
+  const { userCropId } = req.params;
+
+  try {
+    // 1. Get user's crop record
+    const userCrop = await Crop.findById(userCropId);
+    if (!userCrop) {
+      return res.status(404).json({ success: false, message: "Crop record not found." });
+    }
+
+    const cropName = userCrop.cropName.toLowerCase().trim();
+    const { sowingDate, area, unit, farmId } = userCrop;
+
+    // 2. Get crop calendar template (DB first, then AI)
+    let calendarTemplate = await CropCalendar.findOne({ crop_name: cropName });
+
+    let source = "database";
+    if (!calendarTemplate) {
+      console.log(`🤖 [AI CALL] Generating calendar for: ${cropName}`);
+      const aiData = await generateCropData(cropName);
+      calendarTemplate = await CropCalendar.create(aiData);
+      source = "ai_generated";
+      console.log(`💾 [DB SAVE] Saved calendar for: ${cropName}`);
+    }
+
+    // 3. Map relative days → actual calendar dates
+    const stagesWithDates = mapStagesToDates(calendarTemplate.stages, sowingDate);
+
+    // 4. Calculate harvest date and days remaining
+    const totalDays = calendarTemplate.total_duration_days;
+    const estimatedHarvestDate = new Date(sowingDate);
+    estimatedHarvestDate.setDate(estimatedHarvestDate.getDate() + totalDays);
+
+    const today = new Date();
+    const daysElapsed = Math.floor((today - new Date(sowingDate)) / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.max(0, totalDays - daysElapsed);
+
+    // Find the currently active stage
+    const currentStage = stagesWithDates.find((s) => s.status === "ongoing") || null;
+
+    return res.status(200).json({
+      success: true,
+      source,
+      data: {
+        // User crop info
+        userCropId,
+        cropName: userCrop.cropName,
+        farmId,
+        area,
+        unit,
+        sowingDate,
+
+        // Progress
+        totalDays,
+        daysElapsed: Math.max(0, daysElapsed),
+        daysRemaining,
+        progressPercent: Math.min(100, Math.round((daysElapsed / totalDays) * 100)),
+        estimatedHarvestDate,
+
+        // Current status
+        currentStage: currentStage
+          ? {
+            stage_id: currentStage.stage_id,
+            stage_name: currentStage.stage_name,
+            category: currentStage.category,
+            actualStartDate: currentStage.actualStartDate,
+            actualEndDate: currentStage.actualEndDate,
+          }
+          : null,
+
+        // General crop info
+        scientific_name: calendarTemplate.scientific_name,
+        crop_type: calendarTemplate.crop_type,
+        harvest_indicators: calendarTemplate.harvest_indicators,
+        expected_yield_per_hectare: calendarTemplate.expected_yield_per_hectare,
+        storage: calendarTemplate.storage,
+
+        // Full stages with real dates
+        stages: stagesWithDates,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching user crop calendar:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+export { addCrop, deleteCropById, getCropsByUserId, updateCropById, getUserCropCalendar };

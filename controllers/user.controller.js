@@ -26,7 +26,15 @@ const registerUser = async (req, res) => {
       });
     }
 
-    if(phone && !/^\d{10}$/.test(phone)) {
+    // Only allow Farmer registration through public endpoint
+    if (role !== "Farmer") {
+      return res.status(403).json({
+        success: false,
+        message: "Only Farmer registration is allowed through this endpoint. Contact admin to create Staff/FPO accounts.",
+      });
+    }
+
+    if (phone && !/^\d{10}$/.test(phone)) {
       return res.status(400).json({
         success: false,
         message: "Invalid phone number format",
@@ -46,74 +54,16 @@ const registerUser = async (req, res) => {
     let user;
 
     //! FARMER REGISTRATION
-    if (role === "Farmer") {
-      user = await Farmer.create({
-        firstName,
-        lastName,
-        phone,
-        gender,
-        password: hashedPassword,
-        village,
-        district,
-        state,
-      });
-    }
-
-    //! STAFF REGISTRATION
-    else if (role === "Staff") {
-      const { emailId, joiningDate } = req.body;
-
-      if (!emailId || !joiningDate) {
-        return res.status(400).json({
-          success: false,
-          message: "Staff specific fields are required",
-        });
-      }
-
-      user = await Staff.create({
-        firstName,
-        lastName,
-        phone,
-        gender,
-        password: hashedPassword,
-        emailId,
-        joiningDate,
-        village,
-        district,
-        state,
-      });
-    }
-
-    //! FPO REGISTRATION
-    else if (role === "FPO") {
-      const { gstNumber, shopName, emailId } = req.body;
-
-      if (!gstNumber || !shopName || !emailId) {
-        return res.status(400).json({
-          success: false,
-          message: "FPO specific fields are required",
-        });
-      }
-
-      user = await FPO.create({
-        firstName,
-        lastName,
-        phone,
-        gender,
-        password: hashedPassword,
-        gstNumber,
-        shopName,
-        emailId,
-        village,
-        district,
-        state,
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid role",
-      });
-    }
+    user = await Farmer.create({
+      firstName,
+      lastName,
+      phone,
+      gender,
+      password: hashedPassword,
+      village,
+      district,
+      state,
+    });
 
     const token = jwt.sign(
       { id: user._id, role: user.role },
@@ -327,6 +277,7 @@ const updateProfile = async (req, res) => {
       if (req.body.emailId) updateData.emailId = req.body.emailId;
     }
 
+    // Farmer documents
     if (user.role === "Farmer" && req.files) {
       if (req.files.soilHealthCard?.length) {
         const uploaded = await uploadToS3(req.files.soilHealthCard[0], userId);
@@ -484,6 +435,180 @@ const updateProfile = async (req, res) => {
           }
         } catch (error) {
           console.error("❌ Govt Scheme Docs error:", error.message);
+        }
+      }
+    }
+
+    // FPO documents
+    if (user.role === "FPO" && req.files) {
+      if (req.files.seedLicense?.length) {
+        const uploaded = await uploadToS3(req.files.seedLicense[0], userId);
+
+        if (user.seedLicense?.key) {
+          await deleteFromS3(user.seedLicense.key);
+        }
+
+        updateData.seedLicense = uploaded;
+      }
+
+      if (req.files.fertilizerLicense?.length) {
+        const uploaded = await uploadToS3(req.files.fertilizerLicense[0], userId);
+
+        if (user.fertilizerLicense?.key) {
+          await deleteFromS3(user.fertilizerLicense.key);
+        }
+
+        updateData.fertilizerLicense = uploaded;
+      }
+
+      if (req.files.procurementLicense?.length) {
+        const uploaded = await uploadToS3(req.files.procurementLicense[0], userId);
+
+        if (user.procurementLicense?.key) {
+          await deleteFromS3(user.procurementLicense.key);
+        }
+
+        updateData.procurementLicense = uploaded;
+      }
+
+      if (req.files.GSTCertificate?.length) {
+        const uploaded = await uploadToS3(req.files.GSTCertificate[0], userId);
+
+        if (user.GSTCertificate?.key) {
+          await deleteFromS3(user.GSTCertificate.key);
+        }
+
+        updateData.GSTCertificate = uploaded;
+      }
+    }
+
+    // Handle base64 documents for FPO
+    if (user.role === "FPO") {
+      // seed License - single
+      if (req.body.seedLicense) {
+        const processBase64 = async (base64String) => {
+          const base64Data = base64String.split(",")[1];
+          const mimeType = base64String.split(";")[0].split(":")[1];
+          const extension = mimeType.split("/")[1];
+          const buffer = Buffer.from(base64Data, "base64");
+          const fileName = `seedLicense_${Date.now()}.${extension}`;
+
+          return await uploadToS3(
+            {
+              buffer,
+              originalname: fileName,
+              mimetype: mimeType,
+              size: buffer.length,
+              fieldname: "seedLicense",
+            },
+            userId,
+          );
+        };
+
+        try {
+          if (req.body.seedLicense.startsWith("data:")) {
+            const uploaded = await processBase64(req.body.seedLicense);
+            if (user.seedLicense?.key) await deleteFromS3(user.seedLicense.key);
+            updateData.seedLicense = uploaded;
+          }
+        } catch (error) {
+          console.error("Seed License error:", error.message);
+        }
+      }
+
+      // fertilizer License - single
+      if (req.body.fertilizerLicense) {
+        const processBase64 = async (base64String) => {
+          const base64Data = base64String.split(",")[1];
+          const mimeType = base64String.split(";")[0].split(":")[1];
+          const extension = mimeType.split("/")[1];
+          const buffer = Buffer.from(base64Data, "base64");
+          const fileName = `fertilizerLicense_${Date.now()}.${extension}`;
+
+          return await uploadToS3(
+            {
+              buffer,
+              originalname: fileName,
+              mimetype: mimeType,
+              size: buffer.length,
+              fieldname: "fertilizerLicense",
+            },
+            userId,
+          );
+        };
+
+        try {
+          if (req.body.fertilizerLicense.startsWith("data:")) {
+            const uploaded = await processBase64(req.body.fertilizerLicense);
+            if (user.fertilizerLicense?.key) await deleteFromS3(user.fertilizerLicense.key);
+            updateData.fertilizerLicense = uploaded;
+          }
+        } catch (error) {
+          console.error("Fertilizer License error:", error.message);
+        }
+      }
+      
+      // procurement License - single
+      if (req.body.procurementLicense) {
+        const processBase64 = async (base64String) => {
+          const base64Data = base64String.split(",")[1];
+          const mimeType = base64String.split(";")[0].split(":")[1];
+          const extension = mimeType.split("/")[1];
+          const buffer = Buffer.from(base64Data, "base64");
+          const fileName = `procurementLicense_${Date.now()}.${extension}`;
+
+          return await uploadToS3(
+            {
+              buffer,
+              originalname: fileName,
+              mimetype: mimeType,
+              size: buffer.length,
+              fieldname: "procurementLicense",
+            },
+            userId,
+          );
+        };
+
+        try {
+          if (req.body.procurementLicense.startsWith("data:")) {
+            const uploaded = await processBase64(req.body.procurementLicense);
+            if (user.procurementLicense?.key) await deleteFromS3(user.procurementLicense.key);
+            updateData.procurementLicense = uploaded;
+          }
+        } catch (error) {
+          console.error("Procurement License error:", error.message);
+        }
+      }
+
+      // GST Certificate - single
+      if (req.body.GSTCertificate) {
+        const processBase64 = async (base64String) => {
+          const base64Data = base64String.split(",")[1];
+          const mimeType = base64String.split(";")[0].split(":")[1];
+          const extension = mimeType.split("/")[1];
+          const buffer = Buffer.from(base64Data, "base64");
+          const fileName = `GSTCertificate_${Date.now()}.${extension}`;
+
+          return await uploadToS3(
+            {
+              buffer,
+              originalname: fileName,
+              mimetype: mimeType,
+              size: buffer.length,
+              fieldname: "GSTCertificate",
+            },
+            userId,
+          );
+        };
+
+        try {
+          if (req.body.GSTCertificate.startsWith("data:")) {
+            const uploaded = await processBase64(req.body.GSTCertificate);
+            if (user.GSTCertificate?.key) await deleteFromS3(user.GSTCertificate.key);
+            updateData.GSTCertificate = uploaded;
+          }
+        } catch (error) {
+          console.error("GST Certificate error:", error.message);
         }
       }
     }

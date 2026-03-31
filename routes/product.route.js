@@ -13,7 +13,15 @@ import { upload } from "../middlewares/multer.js";
 
 const router = express.Router();
 
-router.post("/addProduct", protect, upload.array("productImages", 5), addProduct);
+router.post(
+  "/addProduct",
+  protect,
+  upload.fields([
+    { name: "productImages", maxCount: 5 },
+    { name: "productVideos", maxCount: 3 },
+  ]),
+  addProduct,
+);
 router.put(
   "/updateProduct/:id",
   protect,

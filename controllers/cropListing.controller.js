@@ -1,6 +1,39 @@
 import { CropListing } from "../models/cropListing.model.js";
 import { deleteFromS3 } from "../utils/s3Delete.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
+import PDFDocument from "pdfkit";
+import path from "path";
+import axios from "axios";
+
+const getAddressFromCoordinates = async (lat, lng) => {
+  try {
+    const response = await axios.get(
+      "https://api.opencagedata.com/geocode/v1/json",
+      {
+        params: {
+          key: process.env.OPENCAGE_API_KEY,
+          q: `${lat},${lng}`,
+        },
+      }
+    );
+
+    const result = response.data.results[0];
+
+    return result?.formatted || `${lat}, ${lng}`;
+  } catch (error) {
+    console.error("Geocoding error:", error.message);
+    return `${lat}, ${lng}`;
+  }
+};
+
+const generateReadableReceiptId = (id) => {
+  const date = new Date();
+
+  const formattedDate = date.toISOString().slice(0, 10).replace(/-/g, "");
+  const shortId = id.toString().slice(-4).toUpperCase();
+
+  return `RCPT-${formattedDate}-${shortId}`;
+};
 
 // add crop to crop listings
 const addCropListing = async (req, res) => {
@@ -379,11 +412,125 @@ const getCropByCropId = async (req, res) => {
   }
 };
 
+// Format date and time in IST
+const istOptions = {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
+function getISTDateTime(timestamp) {
+  return timestamp.toLocaleString("en-IN", istOptions);
+}
+
+async function generateCropListingReceiptPDF(cropListing, user, res) {
+  const doc = new PDFDocument({ margin: 40 });
+
+  doc.font(path.join(process.cwd(), "fonts/NotoSansDevanagari.ttf"));
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename=crop-listing-${cropListing._id}.pdf`
+  );
+
+  doc.pipe(res);
+
+  // HEADER
+  doc
+    .fontSize(18)
+    .text("KISSAN PARIVAR", { align: "center" })
+    .fontSize(14)
+    .text("SELL CROPS RECEIPT", { align: "center" })
+    .moveDown();
+
+  doc.moveTo(40, doc.y).lineTo(550, doc.y).stroke();
+  doc.moveDown();
+
+  const receiptId = generateReadableReceiptId(cropListing._id);
+
+  doc
+    .fontSize(11)
+    .text(`Receipt ID: ${receiptId}`)
+    .text(`Date: ${getISTDateTime(new Date())}`)
+    .moveDown();
+
+  // USER INFO
+  doc
+    .fontSize(13)
+    .text("User Details", { underline: true })
+    .moveDown(0.5);
+
+  doc
+    .fontSize(11)
+    .text(`Name : ${user.firstName} ${user.lastName}`)
+    .text(`Phone: ${user.phone}`)
+    .moveDown();
+
+  // CROP LISTING INFO
+  doc
+    .fontSize(13)
+    .text("Crop Listing Details", { underline: true })
+    .moveDown(0.5);
+
+  // const [lng, lat] = cropListing.location.coordinates;
+  // const address = await getAddressFromCoordinates(lat, lng);
+
+  doc
+    .fontSize(11)
+    .text(`Crop Name : ${cropListing.cropName}`)
+    .text(`Variety   : ${cropListing.variety}`)
+    .text(`Quantity  : ${cropListing.quantity}`)
+    .text(`Price     : ${cropListing.price}`)
+    // .text(`Location  : ${address}`)
+    .text(`Harvest Date: ${getISTDateTime(new Date(cropListing.harvestDate))}`)
+    .moveDown();
+
+  doc.end();
+}
+
+const getCropListingReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (req.user.role !== "Farmer" && req.user.role !== "FPO" && req.user.role !== "Staff") {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const cropListing = await CropListing.findById(id).populate("userId", "firstName lastName phone");
+
+    if (!cropListing) {
+      return res.status(404).json({
+        success: false,
+        message: "Crop listing not found"
+      });
+    }
+
+    if (cropListing.status !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Receipt can only be generated for approved crop listings"
+      });
+    }
+
+    generateCropListingReceiptPDF(cropListing, cropListing.userId, res);
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 export {
-  addCropListing,
-  updateCropListing,
-  deleteCropListing,
-  getCropListings,
-  getCropListingsByUser,
-  getCropByCropId,
+  addCropListing, updateCropListing, deleteCropListing, getCropListings, getCropListingsByUser, getCropByCropId, getCropListingReceipt
 };

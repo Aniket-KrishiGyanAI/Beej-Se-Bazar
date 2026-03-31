@@ -3,6 +3,7 @@ import {
   addCrop,
   deleteCropById,
   getCropsByUserId,
+  getUserCropCalendar,
   updateCropById,
 } from "../controllers/crop.controller.js";
 
@@ -14,5 +15,6 @@ router.post("/addCrop", protect, addCrop);
 router.put("/updateCrop/:id", protect, updateCropById);
 router.delete("/deleteCrop/:id", protect, deleteCropById);
 router.get("/getCropsByUser", protect, getCropsByUserId);
+router.get("/:userCropId/calendar", getUserCropCalendar);
 
 export default router;

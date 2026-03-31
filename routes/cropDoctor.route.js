@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.post(
   "/saveReport",
-  upload.single("diagnosisImage"),
+  upload.fields([{ name: "diagnosisImage", maxCount: 1 }]),
   protect,
   saveReport
 );

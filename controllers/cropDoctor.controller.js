@@ -1,5 +1,6 @@
 import { CropDoctor } from "../models/cropDoctor.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { uploadToS3 } from "../utils/s3Upload.js";
+import { deleteFromS3 } from "../utils/s3Delete.js";
 
 // save report
 const saveReport = async (req, res) => {
@@ -8,37 +9,72 @@ const saveReport = async (req, res) => {
     const userId = req.user._id;
 
     if (!diagnosis) {
-      return res
-        .status(400)
-        .json({ status: "error", message: "Diagnosis is required" });
+      return res.status(400).json({
+        status: "error",
+        message: "Diagnosis is required",
+      });
     }
 
     let imagePath = null;
 
-    // 🚀 Upload to Cloudinary
-    if (req.file) {
-      const uploadResult = await uploadOnCloudinary(
-        req.file.path,
-        "diagnosisReports"
-      );
+    if (req.body.diagnosisImage && req.body.diagnosisImage.startsWith("data:")) {
+      try {
+        const base64Data = req.body.diagnosisImage.split(",")[1];
+        const mimeType = req.body.diagnosisImage.split(";")[0].split(":")[1];
+        const extension = mimeType.split("/")[1];
 
-      if (uploadResult) {
-        imagePath = uploadResult.secure_url;
+        const buffer = Buffer.from(base64Data, "base64");
+        const fileName = `diagnosis_${Date.now()}.${extension}`;
+
+        const mockFile = {
+          buffer,
+          originalname: fileName,
+          mimetype: mimeType,
+          size: buffer.length,
+          fieldname: "diagnosisImage",
+        };
+
+        const uploaded = await uploadToS3(mockFile, userId);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        imagePath = uploaded;
+
+      } catch (error) {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid image format: " + error.message,
+        });
       }
     }
 
+    else if (req.files && req.files.diagnosisImage?.length) {
+      const uploaded = await uploadToS3(
+        req.files.diagnosisImage[0],
+        userId
+      );
+
+      if (!uploaded.url) {
+        uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+      }
+
+      imagePath = uploaded;
+    }
     const newReport = await CropDoctor.create({
       userId,
       diagnosis,
       image: imagePath,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       status: "success",
+      message: "Report created successfully",
       data: newReport,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       status: "error",
       message: error.message,
     });
@@ -96,12 +132,13 @@ const deleteReport = async (req, res) => {
     const { reportId } = req.params;
 
     if (!reportId) {
-      return res
-        .status(400)
-        .json({ status: "error", message: "Report ID is required" });
+      return res.status(400).json({
+        status: "error",
+        message: "Report ID is required",
+      });
     }
 
-    const report = await CropDoctor.findByIdAndDelete(reportId);
+    const report = await CropDoctor.findById(reportId);
 
     if (!report) {
       return res.status(404).json({
@@ -109,12 +146,23 @@ const deleteReport = async (req, res) => {
         message: "Report not found",
       });
     }
-    res.json({
+
+    if (report.image?.key) {
+      try {
+        await deleteFromS3(report.image.key);
+      } catch (err) {
+        console.error("Failed to delete S3 image:", err.message);
+      }
+    }
+
+    await CropDoctor.findByIdAndDelete(reportId);
+
+    return res.status(200).json({
       status: "success",
       message: "Report deleted successfully",
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       status: "error",
       message: error.message,
     });

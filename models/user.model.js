@@ -68,7 +68,7 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      // required: true,
+      required: true,
       unique: true,
     },
 
@@ -175,6 +175,23 @@ const fpoSchema = new mongoose.Schema({
     type: String,
     // required: true,
     unique: true,
+  },
+  seedLicense: {
+    type: s3FileSchema, // PDF
+    default: null,
+  },
+
+  fertilizerLicense: {
+    type: s3FileSchema, // PDF
+    default: null,
+  },
+  procurementLicense: {
+    type: s3FileSchema, // PDF
+    default: null,
+  },
+  GSTCertificate: {
+    type: s3FileSchema, // PDF
+    default: null,
   },
 });
 

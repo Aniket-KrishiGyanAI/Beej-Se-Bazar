@@ -21,6 +21,10 @@ const OrderSchema = new mongoose.Schema(
         },
         quantity: Number,
         expectedPrice: Number,
+        finalPrice: {
+          type: Number,
+          default: null
+        }
       },
     ],
     totalAmount: Number,

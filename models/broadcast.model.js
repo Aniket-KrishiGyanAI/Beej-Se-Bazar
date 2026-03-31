@@ -23,7 +23,8 @@ const broadcastSchema = new mongoose.Schema(
         targetRole: {
             type: String,
             enum: ["Farmer", "FPO", "Staff", "All"], // Target specific roles
-            default: "farmer",
+            default: "Farmer",
+            required: true,
         },
         recipientCount: {
             type: Number, // How many users received it

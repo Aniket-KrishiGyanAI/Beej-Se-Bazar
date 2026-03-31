@@ -1,5 +1,5 @@
 import { Otp } from "../models/otp.model.js";
-import { Farmer, FPO, Staff, User } from "../models/user.model.js";
+import { Farmer, User } from "../models/user.model.js";
 import { generateOtp, hashOtp, compareOtp } from "../utils/otp.js";
 import { sendSms } from "../utils/sendSms.js";
 import jwt from "jsonwebtoken";
@@ -18,8 +18,25 @@ const sendOtp = async (req, res) => {
   try {
     const { mobile, role } = req.body;
 
-    if (!mobile || !role) {
-      return res.status(400).json({ success: false, message: "Mobile number and role are required" });
+    const appHash = process.env.OTP_APP_HASH;
+
+    if (!mobile) {
+      return res.status(400).json({ success: false, message: "Mobile number is required" });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ phone: mobile });
+
+    // Role validation
+    if (!existingUser && role !== "Farmer") {
+      return res.status(403).json({
+        success: false,
+        message: "New users can only register as Farmer. Contact admin to create Staff/FPO accounts.",
+      });
+    }
+
+    if (!existingUser && !role) {
+      return res.status(400).json({ success: false, message: "Role is required for new users" });
     }
 
     // Handle Test Accounts
@@ -48,7 +65,7 @@ const sendOtp = async (req, res) => {
 
     await sendSms({
       mobileNos: mobile,
-      message: `Dear user Your One-Time Password (OTP) for KrishiGyan AI (Powered by Luminoid Technologies Private Limited) is ${otp}. This OTP is valid for 10 minutes. Please do not share it with anyone.`,
+      message: `<#> Your OTP for Luminoid Technologies Private Limited is ${otp}. Valid for 10 minutes. Do not share it with anyone. ${appHash}`,
       templateId: process.env.SMS_TEMPLATE_ID,
     });
 
@@ -65,8 +82,23 @@ const verifyOtp = async (req, res) => {
   try {
     const { mobile, otp, role } = req.body;
 
-    if (!mobile || !otp || !role) {
-      return res.status(400).json({ success: false, message: "Mobile, OTP, and role are required" });
+    if (!mobile || !otp) {
+      return res.status(400).json({ success: false, message: "Mobile and OTP are required" });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ phone: mobile });
+
+    // For new users, role must be Farmer
+    if (!existingUser && role !== "Farmer") {
+      return res.status(403).json({
+        success: false,
+        message: "New users can only register as Farmer",
+      });
+    }
+
+    if (!existingUser && !role) {
+      return res.status(400).json({ success: false, message: "Role is required for new users" });
     }
 
     const record = await Otp.findOne({ mobile });
@@ -106,17 +138,11 @@ const verifyOtp = async (req, res) => {
     let user = await User.findOne({ phone: mobile });
 
     if (!user) {
-      // Create new user with minimal info
-      if (role === "Farmer") {
-        user = await Farmer.create({ phone: mobile });
-      } else if (role === "Staff") {
-        user = await Staff.create({ phone: mobile });
-      } else if (role === "FPO") {
-        user = await FPO.create({ phone: mobile });
-      }
+      // Only create Farmer accounts for new users
+      user = await Farmer.create({ phone: mobile });
     } else {
-      // Check if role matches
-      if (user.role !== role) {
+      // For existing users, verify role matches
+      if (existingUser.role !== role) {
         return res.status(400).json({ success: false, message: "Role does not match with registered user" });
       }
     }

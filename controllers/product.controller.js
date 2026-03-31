@@ -12,6 +12,12 @@ const addProduct = async (req, res) => {
       brand,
       products,
       productImages,
+      productVideos,
+      productCategory,
+      targetCrops,
+      productTechnicalDetails,
+      howToUse,
+      productBenefits
     } = req.body;
 
     // parsing the product
@@ -47,6 +53,7 @@ const addProduct = async (req, res) => {
     }
 
     const uploadedImages = [];
+    const uploadedVideos = [];
 
     // MULTIPLE BASE64 IMAGES
     if (Array.isArray(productImages)) {
@@ -69,7 +76,7 @@ const addProduct = async (req, res) => {
           fieldname: "productImages",
         };
 
-        const uploaded = await uploadToS3(mockFile, req.user._id);
+        const uploaded = await uploadToS3(mockFile, userId);
 
         if (!uploaded.url) {
           uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
@@ -82,13 +89,77 @@ const addProduct = async (req, res) => {
     // MULTIPLE FORM-DATA FILES
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        const uploaded = await uploadToS3(file, req.user._id);
+        const uploaded = await uploadToS3(file, userId);
 
         if (!uploaded.url) {
           uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
         }
 
         uploadedImages.push(uploaded);
+      }
+    }
+
+    // MULTIPLE BASE64 VIDEOS
+    if (Array.isArray(productVideos)) {
+      console.log("productVideos:", productVideos);
+
+      if (typeof productVideos === "string") {
+        try {
+          productVideos = JSON.parse(productVideos);
+        } catch (err) {
+          productVideos = [];
+        }
+      }
+
+      for (const base64Video of productVideos) {
+        if (
+          typeof base64Video !== "string" ||
+          !base64Video.startsWith("data:")
+        ) {
+          continue;
+        }
+
+        const base64Data = base64Video.split(",")[1];
+        const matches = base64Video.match(/^data:(.+);base64,/);
+        if (!matches) continue;
+
+        const mimeType = matches[1];
+        const extension = mimeType.split("/")[1] || "mp4";
+
+        const buffer = Buffer.from(base64Data, "base64");
+
+        const mockFile = {
+          buffer,
+          originalname: `product_video_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}.${extension}`,
+          mimetype: mimeType,
+          size: buffer.length,
+          fieldname: "productVideos",
+        };
+
+        const uploaded = await uploadToS3(mockFile, userId);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        uploadedVideos.push(uploaded);
+      }
+    }
+
+    // MULTIPLE FORM-DATA VIDEO FILES
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        if (file.fieldname === "productVideos") {
+          const uploaded = await uploadToS3(file, userId);
+
+          if (!uploaded.url) {
+            uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+          }
+
+          uploadedVideos.push(uploaded);
+        }
       }
     }
 
@@ -118,6 +189,12 @@ const addProduct = async (req, res) => {
       brand,
       products,
       productImages: uploadedImages,
+      productVideos: uploadedVideos,
+      productCategory,
+      targetCrops: targetCrops || [],
+      productTechnicalDetails,
+      howToUse,
+      productBenefits
     });
 
     // Inventory handling (ADD STOCK)
@@ -181,10 +258,26 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const userId = req.user._id;
 
-    let { productName, description, brand, products, productImages } = req.body;
+    let { productName, description, brand, products, productImages, productVideos, productCategory, targetCrops, productTechnicalDetails, howToUse, productBenefits } = req.body;
 
     if (typeof products === "string") {
       products = JSON.parse(products);
+    }
+
+    if (typeof productImages === "string") {
+      try {
+        productImages = JSON.parse(productImages);
+      } catch {
+        productImages = [];
+      }
+    }
+
+    if (typeof productVideos === "string") {
+      try {
+        productVideos = JSON.parse(productVideos);
+      } catch {
+        productVideos = [];
+      }
     }
 
     if (req.user.role !== "FPO" && req.user.role !== "Staff") {
@@ -299,66 +392,126 @@ const updateProduct = async (req, res) => {
       updatedData.productImages = uploadedImages;
     }
 
+    const uploadedVideos = [];
+
+    if (Array.isArray(productVideos)) {
+      for (const base64Video of productVideos) {
+        if (typeof base64Video !== "string" || !base64Video.startsWith("data:")) continue;
+
+        const base64Data = base64Video.split(",")[1];
+        const matches = base64Video.match(/^data:(.+);base64,/);
+        if (!matches) continue;
+
+        const mimeType = matches[1];
+        const extension = mimeType.split("/")[1] || "mp4";
+
+        const buffer = Buffer.from(base64Data, "base64");
+
+        const mockFile = {
+          buffer,
+          originalname: `product_video_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}.${extension}`,
+          mimetype: mimeType,
+          size: buffer.length,
+          fieldname: "productVideos",
+        };
+
+        const uploaded = await uploadToS3(mockFile, userId);
+
+        if (!uploaded.url) {
+          uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+        }
+
+        uploadedVideos.push(uploaded);
+      }
+    }
+
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        if (file.fieldname === "productVideos") {
+          const uploaded = await uploadToS3(file, userId);
+
+          if (!uploaded.url) {
+            uploaded.url = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${uploaded.key}`;
+          }
+
+          uploadedVideos.push(uploaded);
+        }
+      }
+    }
+
+    if (uploadedVideos.length > 0) {
+      for (const video of existingProduct.productVideos || []) {
+        if (video?.key) {
+          await deleteFromS3(video.key);
+        }
+      }
+
+      updatedData.productVideos = uploadedVideos;
+    }
+
+    if (productCategory) updatedData.productCategory = productCategory;
+    if (productTechnicalDetails) updatedData.productTechnicalDetails = productTechnicalDetails;
+    if (howToUse) updatedData.howToUse = howToUse;
+    if (productBenefits) updatedData.productBenefits = productBenefits;
+    if (targetCrops) updatedData.targetCrops = targetCrops;
+
     const updatedProduct = await Product.findByIdAndUpdate(id, updatedData, {
       new: true,
     });
 
-    if (Array.isArray(products)) {
-      for (const variant of products) {
+    // Inventory handling (ADD STOCK)
+    for (const variant of updatedProduct.products) {
 
-        let inventoryItem = await InventoryItem.findOne({
-          sourceRef: updatedProduct._id,
-          variantId: variant._id
-        });
-
-        if (!inventoryItem) {
-          inventoryItem = await InventoryItem.create({
-            sourceType: "PRODUCT",
-            sourceRef: updatedProduct._id,
-            variantId: variant._id,
-            itemName: `${updatedProduct.productName.trim()} ${variant.parameter}${variant.unit}`,
-            brand: updatedProduct.brand.trim(),
-            unit: variant.unit,
-            parameter: variant.parameter,
-            expiryDate: variant.expiryDate || null,
-            purchasePrice: variant.mrp
-          });
-        } else {
-          inventoryItem.purchasePrice = variant.mrp;
-          inventoryItem.expiryDate = variant.expiryDate || null;
-          await inventoryItem.save();
-        }
-
-        let inventoryStock = await InventoryStock.findOne({
-          item: inventoryItem._id
-        });
-
-        if (!inventoryStock) {
-          await InventoryStock.create({
-            item: inventoryItem._id,
-            availableQuantity: variant.quantity,
-            lastUpdatedBy: userId
-          });
-        } else {
-          inventoryStock.availableQuantity = variant.quantity;
-          inventoryStock.lastUpdatedBy = userId;
-          inventoryStock.lastUpdatedAt = new Date();
-          await inventoryStock.save();
-        }
-      }
-
-      // Remove inventory for deleted variants
-      const variantIds = products.map(v => v._id.toString());
-
-      const inventoryItems = await InventoryItem.find({
-        sourceRef: updatedProduct._id
+      let inventoryItem = await InventoryItem.findOne({
+        sourceRef: updatedProduct._id,
+        variantId: variant._id
       });
 
-      for (const item of inventoryItems) {
-        if (!variantIds.includes(item.variantId.toString())) {
-          await InventoryStock.deleteOne({ item: item._id });
-          await InventoryItem.deleteOne({ _id: item._id });
-        }
+      if (!inventoryItem) {
+        inventoryItem = await InventoryItem.create({
+          sourceType: "PRODUCT",
+          sourceRef: updatedProduct._id,
+          variantId: variant._id,
+          itemName: `${updatedProduct.productName.trim()} ${variant.parameter}${variant.unit}`,
+          brand: updatedProduct.brand.trim(),
+          unit: variant.unit,
+          parameter: variant.parameter,
+          expiryDate: variant.expiryDate || null,
+          purchasePrice: variant.mrp
+        });
+      }
+
+      let inventoryStock = await InventoryStock.findOne({
+        item: inventoryItem._id,
+      });
+
+      if (!inventoryStock) {
+        await InventoryStock.create({
+          item: inventoryItem._id,
+          availableQuantity: variant.quantity,
+          lastUpdatedBy: userId
+        });
+      } else {
+        inventoryStock.availableQuantity = variant.quantity;
+        inventoryStock.lastUpdatedBy = userId;
+        inventoryStock.lastUpdatedAt = new Date();
+        await inventoryStock.save();
+      }
+    }
+
+    // Remove inventory for deleted variants
+    const variantIds = products.map(v => v._id.toString());
+
+    const inventoryItems = await InventoryItem.find({
+      sourceRef: updatedProduct._id
+    });
+
+    for (const item of inventoryItems) {
+      if (!variantIds.includes(item.variantId.toString())) {
+        await InventoryStock.deleteOne({ item: item._id });
+        await InventoryItem.deleteOne({ _id: item._id });
       }
     }
 
