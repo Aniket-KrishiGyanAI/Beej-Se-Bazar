@@ -7,6 +7,9 @@ export const getS3UploadPath = (fieldname) => {
     case "productImages":
       return { scope: "public", folder: "products" };
 
+    case "productVideos":
+      return { scope: "public", folder: "products" };
+
     case "cropImages":
       return { scope: "public", folder: "crops" };
 
@@ -16,8 +19,11 @@ export const getS3UploadPath = (fieldname) => {
     case "profileImage":
       return { scope: "public", folder: "profiles" };
 
+    case "broadcastImage":
+      return { scope: "public", folder: "broadcasts" };
+
     case "diagnosisImage":
-      return { scope: "private", folder: "diagnosis-reports" };
+      return { scope: "public", folder: "diagnosis-reports" };
 
     case "soilHealthCard":
       return { scope: "private", folder: "soil-health" };
@@ -30,6 +36,21 @@ export const getS3UploadPath = (fieldname) => {
 
     case "governmentDocument":
       return { scope: "private", folder: "government-docs" };
+
+    case "seedLicense":
+      return { scope: "private", folder: "seed-licenses" };
+
+    case "fertilizerLicense":
+      return { scope: "private", folder: "fertilizer-licenses" };
+
+    case "procurementLicense":
+      return { scope: "private", folder: "procurement-licenses" };
+
+    case "GSTCertificate":
+      return { scope: "private", folder: "gst-certificates" };
+
+    case "posterImages":
+      return { scope: "public", folder: "posters" };
 
     default:
       return { scope: "private", folder: "others" };
