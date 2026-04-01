@@ -19,9 +19,12 @@ import chatRoutes from "./routes/chat.route.js";
 import reportRoutes from "./routes/report.route.js";
 import postRoutes from "./routes/post.route.js";
 import fcmRoutes from "./routes/fcm.route.js"
+import broadcastRoutes from "./routes/broadcast.route.js"
+import couponRoutes from "./routes/coupon.route.js";
+import ledgerRoute from "./routes/ledger.route.js";
+import advertisementPosterRoute from "./routes/advertisementPoster.route.js";
+import cropCaledarRoute from "./routes/cropCalendar.route.js";
 import paymentRoute from "./routes/payment.route.js";
-
-import admin from "./config/firebase.js";
 
 const app = express();
 
@@ -37,8 +40,17 @@ app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
 app.get("/", (req, res) => {
-  res.send("Welcome to Beej Se Bazar ✅");
+  res.send("Welcome to Marjeevi FPO 🚀");
 });
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date(),
+    uptime: process.uptime()
+  });
+});
+
 
 app.use("/api/user", userRoutes);
 app.use("/api/crop-listing", cropListingRoutes);
@@ -58,28 +70,11 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/fcm", fcmRoutes);
+app.use("/api/broadcast", broadcastRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/ledger", ledgerRoute);
+app.use("/api/advertisement-posters", advertisementPosterRoute);
+app.use("/api/crop-calendar", cropCaledarRoute);
 app.use("/api/payment", paymentRoute);
-
-app.post("/fcm/test", async (req, res) => {
-  try {
-    const { token } = req.body;
-
-    const response = await admin.messaging().send({
-      token,
-      notification: {
-        title: "Direct Console Test",
-        body: "Testing single device token",
-      },
-    });
-
-    console.log("Direct Send Response:", response);
-
-    res.json({ success: true, response });
-
-  } catch (error) {
-    console.error("Direct Send Error:", error);
-    res.status(500).json({ error });
-  }
-});
 
 export default app;
