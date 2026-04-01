@@ -258,6 +258,7 @@ const updateOrderStatus = async (req, res) => {
       if (order.paymentMethod === "CREDIT" && creditDays) {
         dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + creditDays);
+        updateData.creditDays = creditDays;
       }
 
       const receiptNumber = `RCPT-${Date.now()}`;
@@ -496,7 +497,7 @@ const generateReceiptPDF = (receipt, res) => {
   // HEADER
   doc
     .fontSize(18)
-    .text("KISSAN PARIVAR", { align: "center" })
+    .text("BEEJ SE BAZAR", { align: "center" })
     .fontSize(14)
     .text("SALES RECEIPT", { align: "center" })
     .moveDown();

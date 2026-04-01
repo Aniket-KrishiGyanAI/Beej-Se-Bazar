@@ -384,7 +384,7 @@ const generateProcurementReceiptPDF = (purchase, farmer, res) => {
   // HEADER
   doc
     .fontSize(18)
-    .text("KISSAN PARIVAR", { align: "center" })
+    .text("BEEJ SE BAZAR", { align: "center" })
     .fontSize(14)
     .text("PROCUREMENT RECEIPT", { align: "center" })
     .moveDown();

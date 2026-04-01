@@ -19,6 +19,7 @@ import chatRoutes from "./routes/chat.route.js";
 import reportRoutes from "./routes/report.route.js";
 import postRoutes from "./routes/post.route.js";
 import fcmRoutes from "./routes/fcm.route.js"
+import paymentRoute from "./routes/payment.route.js";
 
 import admin from "./config/firebase.js";
 
@@ -57,6 +58,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/fcm", fcmRoutes);
+app.use("/api/payment", paymentRoute);
 
 app.post("/fcm/test", async (req, res) => {
   try {

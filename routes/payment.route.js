@@ -1,6 +1,6 @@
 import express from "express";
-import { farmerPayment, fpoPayment } from "../controllers/payment.controller";
-import { protect } from "../middlewares/auth";
+import { farmerPayment, fpoPayment, getFarmerBalance } from "../controllers/payment.controller.js";
+import { protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 

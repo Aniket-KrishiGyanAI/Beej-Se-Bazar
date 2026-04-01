@@ -1,4 +1,4 @@
-import { Payment } from "../models/payment.model";
+import { Payment } from "../models/payment.model.js";
 
 // Farmer pays to FPO
 const farmerPayment = async (req, res) => {

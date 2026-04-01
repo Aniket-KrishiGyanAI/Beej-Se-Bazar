@@ -444,7 +444,7 @@ async function generateCropListingReceiptPDF(cropListing, user, res) {
   // HEADER
   doc
     .fontSize(18)
-    .text("KISSAN PARIVAR", { align: "center" })
+    .text("BEEJ SE BAZAR", { align: "center" })
     .fontSize(14)
     .text("SELL CROPS RECEIPT", { align: "center" })
     .moveDown();
