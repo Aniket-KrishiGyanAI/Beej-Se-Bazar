@@ -4,7 +4,7 @@ export const getS3UploadPath = (fieldname) => {
     case "images[]":
       return { scope: "public", folder: "products" };
 
-    case "productImage":
+    case "productImages":
       return { scope: "public", folder: "products" };
 
     case "cropImages":
