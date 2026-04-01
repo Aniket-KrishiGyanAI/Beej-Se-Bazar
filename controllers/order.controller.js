@@ -259,6 +259,7 @@ const updateOrderStatus = async (req, res) => {
         dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + creditDays);
         updateData.creditDays = creditDays;
+        updateData.dueDate = dueDate;
       }
 
       const receiptNumber = `RCPT-${Date.now()}`;
