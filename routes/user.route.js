@@ -8,6 +8,7 @@ import {
   registerUser,
   signInUser,
   updateProfile,
+  logoutUser,
 } from "../controllers/user.controller.js";
 import { uploadDocuments } from "../controllers/document.controller.js";
 import { protect } from "../middlewares/auth.js";
@@ -36,10 +37,11 @@ router.post("/upload-documents", protect, upload.fields([
   { name: "labReport", maxCount: 1 },
   { name: "governmentDocument", maxCount: 1 },
 ]), uploadDocuments);
-router.delete("/delete-account",protect, deleteUser);
-router.get("/getUserDetails",protect, getUserDetails);
+router.delete("/delete-account", protect, deleteUser);
+router.get("/getUserDetails", protect, getUserDetails);
 router.get("/getAllUsers", protect, getAllUsers);
 router.get("/files/private", protect, getUserPrivateFiles);
 router.get("/getAllFarmers", protect, getAllFarmers);
+router.get("/logout", protect, logoutUser);
 
 export default router;

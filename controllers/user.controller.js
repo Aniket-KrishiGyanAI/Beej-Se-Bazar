@@ -547,7 +547,7 @@ const updateProfile = async (req, res) => {
           console.error("Fertilizer License error:", error.message);
         }
       }
-      
+
       // procurement License - single
       if (req.body.procurementLicense) {
         const processBase64 = async (base64String) => {
@@ -661,6 +661,10 @@ const updateProfile = async (req, res) => {
 
 // logout user
 const logoutUser = (req, res) => {
+
+  // remove the fcmToken
+  User.findByIdAndUpdate(req.user._id, { $set: { fcmTokens: [] } }).exec();
+
   res.status(200).json({
     success: true,
     message: "Logout successful",

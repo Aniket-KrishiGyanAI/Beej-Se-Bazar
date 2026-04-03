@@ -669,9 +669,9 @@ const updateOrderPrices = async (req, res) => {
           throw new Error("Invalid price - price must be greater than 0");
         }
 
-        if (updatedItem.finalPrice >= orderItem.item.expectedPrice) {
+        if (updatedItem.finalPrice >= orderItem.expectedPrice) {
           throw new Error(
-            `Invalid price - final price (${updatedItem.finalPrice}) must be less than MRP (${orderItem.item.expectedPrice}) for ${orderItem.item.itemName}`
+            `Invalid price - final price (${updatedItem.finalPrice}) must be less than MRP (${orderItem.expectedPrice}) for ${orderItem.itemName}`
           );
         }
 
