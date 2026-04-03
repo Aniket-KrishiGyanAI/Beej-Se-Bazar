@@ -68,7 +68,6 @@ const CropCalendarSchema = new mongoose.Schema(
       required: true,
       unique: true,
       index: true,
-      set: (v) => v.toUppercase().trim(),
     },
     crop_name: {
       type: String,
