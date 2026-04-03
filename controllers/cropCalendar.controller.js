@@ -11,7 +11,7 @@ const getCropCalendar = async (req, res) => {
 
     try {
         // 1. Check DB first
-        const existing = await CropCalendar.findOne({ crop_name: cropName });
+        const existing = await CropCalendar.findOne({ crop_name_english: cropName });
 
         if (existing) {
             console.log(`✅ [DB HIT] Returning cached data for: ${cropName}`);

@@ -63,6 +63,13 @@ const StorageSchema = new mongoose.Schema({
 
 const CropCalendarSchema = new mongoose.Schema(
   {
+    crop_name_english: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      set: (v) => v.toUppercase().trim(),
+    },
     crop_name: {
       type: String,
       required: true,

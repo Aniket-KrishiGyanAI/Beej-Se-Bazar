@@ -6,11 +6,16 @@ const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 const CROP_CALENDAR_PROMPT = (cropName) => `
 You are an agricultural data expert. Generate a detailed crop calendar JSON for "${cropName}".
 
-Return ONLY a valid JSON object with no explanation, no markdown, no code fences.
+The field "crop_name_english" must always be in English (the crop name you were given).
+All text values inside the JSON must be written in Hindi (Devanagari script),
+except for these fields which must remain in English exactly as specified:
+"category", "type", "unit", "method" (in irrigation).
+Keep all JSON keys in English exactly as specified.
 
 The JSON must follow this exact structure:
 
 {
+  "crop_name_english": "string",
   "crop_name": "string",
   "scientific_name": "string",
   "crop_type": "string (e.g. Cereal, Vegetable, Fruit, Pulse, Oilseed)",
@@ -73,17 +78,17 @@ The JSON must follow this exact structure:
 `;
 
 const generateCropData = async (cropName) => {
-    const result = await model.generateContent(CROP_CALENDAR_PROMPT(cropName));
-    const rawText = result.response.text();
+  const result = await model.generateContent(CROP_CALENDAR_PROMPT(cropName));
+  const rawText = result.response.text();
 
-    // Strip any accidental markdown fences if model adds them
-    const cleaned = rawText
-        .replace(/```json\s*/gi, "")
-        .replace(/```\s*/g, "")
-        .trim();
+  // Strip any accidental markdown fences if model adds them
+  const cleaned = rawText
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
 
-    const parsed = JSON.parse(cleaned);
-    return parsed;
+  const parsed = JSON.parse(cleaned);
+  return parsed;
 }
 
 export { generateCropData };
