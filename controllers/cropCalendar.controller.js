@@ -3,7 +3,7 @@ import { generateCropData } from "../utils/cropCalenderData.js";
 
 // Returns crop calendar - from DB if exists, else generates via AI and saves.
 const getCropCalendar = async (req, res) => {
-    const cropName = req.params.cropName.toLowerCase().trim();
+    const cropName = req.params.cropName.trim();
 
     if (!cropName) {
         return res.status(400).json({ success: false, message: "Crop name is required." });
@@ -14,7 +14,6 @@ const getCropCalendar = async (req, res) => {
         const existing = await CropCalendar.findOne({ crop_name_english: cropName });
 
         if (existing) {
-            console.log(`✅ [DB HIT] Returning cached data for: ${cropName}`);
             return res.status(200).json({
                 success: true,
                 source: "database",
@@ -23,16 +22,13 @@ const getCropCalendar = async (req, res) => {
         }
 
         // 2. Not in DB → generate from AI
-        console.log(`🤖 [AI CALL] Generating data for: ${cropName}`);
         const aiData = await generateCropData(cropName);
 
         // 3. Save to DB
         const saved = await CropCalendar.create(aiData);
-        console.log(`💾 [DB SAVE] Saved crop data for: ${cropName}`);
-
         return res.status(201).json({
             success: true,
-            source: "ai_generated",
+            source: "",
             data: saved,
         });
     } catch (error) {

@@ -313,19 +313,17 @@ const getUserCropCalendar = async (req, res) => {
       return res.status(404).json({ success: false, message: "Crop record not found." });
     }
 
-    const cropName = userCrop.cropName.toLowerCase().trim();
+    const cropName = userCrop.cropName.trim();
     const { sowingDate, area, unit, farmId } = userCrop;
 
     // 2. Get crop calendar template (DB first, then AI)
-    let calendarTemplate = await CropCalendar.findOne({ crop_name: cropName });
+    let calendarTemplate = await CropCalendar.findOne({ crop_name_english: cropName });
 
     let source = "database";
     if (!calendarTemplate) {
-      console.log(`🤖 [AI CALL] Generating calendar for: ${cropName}`);
       const aiData = await generateCropData(cropName);
       calendarTemplate = await CropCalendar.create(aiData);
-      source = "ai_generated";
-      console.log(`💾 [DB SAVE] Saved calendar for: ${cropName}`);
+      source = "";
     }
 
     // 3. Map relative days → actual calendar dates
