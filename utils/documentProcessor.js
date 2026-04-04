@@ -142,3 +142,79 @@ export const processDocuments = async (
 
   return updateData;
 };
+
+export const deleteDocuments = async (
+  fieldname,
+  deleteIndices,
+  currentDocuments,
+) => {
+  try {
+    if (!Array.isArray(currentDocuments) || currentDocuments.length === 0) {
+      throw new Error(`No documents found for ${fieldname}`);
+    }
+
+    // Normalize deleteIndices to array
+    const indicesToDelete = Array.isArray(deleteIndices)
+      ? deleteIndices
+      : [deleteIndices];
+
+    // Sort in descending order to delete from end first (prevents index shifting issues)
+    const sortedIndices = [...new Set(indicesToDelete)]
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    // Validate indices
+    for (const idx of sortedIndices) {
+      if (idx < 0 || idx >= currentDocuments.length) {
+        throw new Error(
+          `Invalid index: ${idx}. Valid range: 0-${currentDocuments.length - 1}`,
+        );
+      }
+    }
+
+    // Delete from S3 and track for removal
+    const updatedDocs = [...currentDocuments];
+
+    for (const idx of sortedIndices) {
+      const doc = updatedDocs[idx];
+      if (doc?.key) {
+        await deleteFromS3(doc.key);
+      }
+      updatedDocs.splice(idx, 1); // Remove from array
+    }
+
+    return updatedDocs;
+  } catch (error) {
+    console.error(`❌ ${fieldname} deletion error:`, error.message);
+    throw error;
+  }
+};
+
+export const processDocumentDeletions = async (role, reqBody, user) => {
+  const updateData = {};
+
+  const roleDocuments = Object.entries(DOCUMENT_CONFIG).filter(
+    ([_, config]) => config.role === role && config.isArray,
+  );
+
+  for (const [fieldname, _] of roleDocuments) {
+    // Check if deletion request exists: fieldname_delete or fieldname_deleteIndex
+    const deleteParam = reqBody[`${fieldname}_delete`] || reqBody[`${fieldname}_deleteIndex`];
+
+    if (deleteParam === undefined || deleteParam === null) continue;
+
+    try {
+      const result = await deleteDocuments(
+        fieldname,
+        deleteParam, // Can be single index or array of indices
+        user[fieldname],
+      );
+      updateData[fieldname] = result;
+    } catch (error) {
+      console.error(`Error deleting ${fieldname}:`, error.message);
+      throw error;
+    }
+  }
+
+  return updateData;
+};

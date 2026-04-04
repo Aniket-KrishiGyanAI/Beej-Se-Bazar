@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { uploadToS3 } from "../utils/s3Upload.js";
 import { deleteFromS3 } from "../utils/s3Delete.js";
 import { generateSignedUrl } from "../utils/s3SignedUrl.js";
-import { processDocuments } from "../utils/documentProcessor.js";
+import { processDocumentDeletions, processDocuments } from "../utils/documentProcessor.js";
 
 const registerUser = async (req, res) => {
   try {
@@ -439,6 +439,13 @@ const updateProfile = async (req, res) => {
         }
       }
     }
+
+    const deletionUpdates = await processDocumentDeletions(
+      user.role,
+      req.body,
+      user,
+    );
+    Object.assign(updateData, deletionUpdates);
 
     // FPO documents
     const documentUpdates = await processDocuments(
