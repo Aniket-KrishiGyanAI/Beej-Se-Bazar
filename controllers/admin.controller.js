@@ -1,4 +1,5 @@
 import { User, Staff, FPO } from "../models/user.model.js";
+import { DOCUMENT_CONFIG } from "../utils/documentConfig.js";
 import { generateSignedUrl } from "../utils/s3SignedUrl.js";
 import bcrypt from "bcrypt";
 
@@ -13,15 +14,7 @@ const getAdminPrivateFiles = async (req, res) => {
       });
     }
 
-    const ALLOWED_TYPES = [
-      "soilHealthCard",
-      "labReport",
-      "govtSchemeDocs",
-      "seedLicense",
-      "fertilizerLicense",
-      "procurementLicense",
-      "GSTCertificate",
-    ];
+    const ALLOWED_TYPES = Object.keys(DOCUMENT_CONFIG);
 
     if (!type || !ALLOWED_TYPES.includes(type)) {
       return res.status(400).json({
@@ -30,9 +23,9 @@ const getAdminPrivateFiles = async (req, res) => {
       });
     }
 
-    const user = await User.findById(userId).select(
-      "soilHealthCard labReport govtSchemeDocs seedLicense fertilizerLicense procurementLicense GSTCertificate",
-    );
+    const selectFields = ALLOWED_TYPES.join(" ");
+
+    const user = await User.findById(userId).select(selectFields);
 
     if (!user) {
       return res.status(404).json({
@@ -50,8 +43,11 @@ const getAdminPrivateFiles = async (req, res) => {
 
     let files = [];
 
+    const docConfig = DOCUMENT_CONFIG[type];
+    const isArrayDocument = docConfig.isArray;
+
     // Handle single files
-    if (type !== "govtSchemeDocs") {
+    if (!isArrayDocument) {
       if (!user[type]?.key) {
         return res.status(404).json({
           success: false,
@@ -61,9 +57,9 @@ const getAdminPrivateFiles = async (req, res) => {
       files = [user[type]];
     }
 
-    // Handle multiple files (govtSchemeDocs)
-    if (type === "govtSchemeDocs") {
-      if (!user.govtSchemeDocs?.length) {
+    // Handle multiple files (array documents)
+    if (isArrayDocument) {
+      if (!user[type]?.length) {
         return res.status(404).json({
           success: false,
           message: "No documents found",
@@ -72,8 +68,8 @@ const getAdminPrivateFiles = async (req, res) => {
 
       files =
         index !== undefined
-          ? [user.govtSchemeDocs[Number(index)]].filter(Boolean)
-          : user.govtSchemeDocs;
+          ? [user[type][Number(index)]].filter(Boolean)
+          : user[type];
 
       if (!files.length) {
         return res.status(404).json({
