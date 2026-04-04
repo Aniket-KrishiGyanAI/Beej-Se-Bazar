@@ -29,6 +29,12 @@ router.put(
     { name: "fertilizerLicense", maxCount: 1 },
     { name: "procurementLicense", maxCount: 1 },
     { name: "GSTCertificate", maxCount: 1 },
+    { name: "CINCertificate", maxCount: 1 },
+    { name: "PANCard", maxCount: 1 },
+    { name: "InsecticidesLicense", maxCount: 1 },
+    { name: "CEODocuments", maxCount: 3 },
+    { name: "BODDocuments", maxCount: 3 },
+    { name: "FinancialDocuments", maxCount: 3 },
   ]),
   updateProfile
 );
