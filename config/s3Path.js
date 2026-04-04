@@ -1,4 +1,14 @@
+import { DOCUMENT_CONFIG } from "../utils/documentConfig.js";
+
 export const getS3UploadPath = (fieldname) => {
+  if (DOCUMENT_CONFIG[fieldname]) {
+    const config = DOCUMENT_CONFIG[fieldname];
+    return {
+      scope: config.scope,
+      folder: config.folder,
+    };
+  }
+
   switch (fieldname) {
     case "images":
     case "images[]":
@@ -33,21 +43,6 @@ export const getS3UploadPath = (fieldname) => {
 
     case "govtSchemeDocs":
       return { scope: "private", folder: "govt-schemes" };
-
-    case "governmentDocument":
-      return { scope: "private", folder: "government-docs" };
-
-    case "seedLicense":
-      return { scope: "private", folder: "seed-licenses" };
-
-    case "fertilizerLicense":
-      return { scope: "private", folder: "fertilizer-licenses" };
-
-    case "procurementLicense":
-      return { scope: "private", folder: "procurement-licenses" };
-
-    case "GSTCertificate":
-      return { scope: "private", folder: "gst-certificates" };
 
     case "posterImages":
       return { scope: "public", folder: "posters" };

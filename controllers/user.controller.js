@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { uploadToS3 } from "../utils/s3Upload.js";
 import { deleteFromS3 } from "../utils/s3Delete.js";
 import { generateSignedUrl } from "../utils/s3SignedUrl.js";
+import { processDocuments } from "../utils/documentProcessor.js";
 
 const registerUser = async (req, res) => {
   try {
@@ -192,7 +193,7 @@ const updateProfile = async (req, res) => {
     // Handle profile image - both Base64 and FormData
     if (req.body.profileImage && req.body.profileImage.startsWith("data:")) {
       try {
-        console.log("📸 Processing base64 profile image...");
+        console.log("Processing base64 profile image...");
         const base64Data = req.body.profileImage.split(",")[1];
         const mimeType = req.body.profileImage.split(";")[0].split(":")[1];
         const extension = mimeType.split("/")[1];
@@ -440,178 +441,16 @@ const updateProfile = async (req, res) => {
     }
 
     // FPO documents
-    if (user.role === "FPO" && req.files) {
-      if (req.files.seedLicense?.length) {
-        const uploaded = await uploadToS3(req.files.seedLicense[0], userId);
+    const documentUpdates = await processDocuments(
+      user.role,
+      req.body,
+      req.files,
+      user,
+      userId,
+    );
 
-        if (user.seedLicense?.key) {
-          await deleteFromS3(user.seedLicense.key);
-        }
-
-        updateData.seedLicense = uploaded;
-      }
-
-      if (req.files.fertilizerLicense?.length) {
-        const uploaded = await uploadToS3(req.files.fertilizerLicense[0], userId);
-
-        if (user.fertilizerLicense?.key) {
-          await deleteFromS3(user.fertilizerLicense.key);
-        }
-
-        updateData.fertilizerLicense = uploaded;
-      }
-
-      if (req.files.procurementLicense?.length) {
-        const uploaded = await uploadToS3(req.files.procurementLicense[0], userId);
-
-        if (user.procurementLicense?.key) {
-          await deleteFromS3(user.procurementLicense.key);
-        }
-
-        updateData.procurementLicense = uploaded;
-      }
-
-      if (req.files.GSTCertificate?.length) {
-        const uploaded = await uploadToS3(req.files.GSTCertificate[0], userId);
-
-        if (user.GSTCertificate?.key) {
-          await deleteFromS3(user.GSTCertificate.key);
-        }
-
-        updateData.GSTCertificate = uploaded;
-      }
-    }
-
-    // Handle base64 documents for FPO
-    if (user.role === "FPO") {
-      // seed License - single
-      if (req.body.seedLicense) {
-        const processBase64 = async (base64String) => {
-          const base64Data = base64String.split(",")[1];
-          const mimeType = base64String.split(";")[0].split(":")[1];
-          const extension = mimeType.split("/")[1];
-          const buffer = Buffer.from(base64Data, "base64");
-          const fileName = `seedLicense_${Date.now()}.${extension}`;
-
-          return await uploadToS3(
-            {
-              buffer,
-              originalname: fileName,
-              mimetype: mimeType,
-              size: buffer.length,
-              fieldname: "seedLicense",
-            },
-            userId,
-          );
-        };
-
-        try {
-          if (req.body.seedLicense.startsWith("data:")) {
-            const uploaded = await processBase64(req.body.seedLicense);
-            if (user.seedLicense?.key) await deleteFromS3(user.seedLicense.key);
-            updateData.seedLicense = uploaded;
-          }
-        } catch (error) {
-          console.error("Seed License error:", error.message);
-        }
-      }
-
-      // fertilizer License - single
-      if (req.body.fertilizerLicense) {
-        const processBase64 = async (base64String) => {
-          const base64Data = base64String.split(",")[1];
-          const mimeType = base64String.split(";")[0].split(":")[1];
-          const extension = mimeType.split("/")[1];
-          const buffer = Buffer.from(base64Data, "base64");
-          const fileName = `fertilizerLicense_${Date.now()}.${extension}`;
-
-          return await uploadToS3(
-            {
-              buffer,
-              originalname: fileName,
-              mimetype: mimeType,
-              size: buffer.length,
-              fieldname: "fertilizerLicense",
-            },
-            userId,
-          );
-        };
-
-        try {
-          if (req.body.fertilizerLicense.startsWith("data:")) {
-            const uploaded = await processBase64(req.body.fertilizerLicense);
-            if (user.fertilizerLicense?.key) await deleteFromS3(user.fertilizerLicense.key);
-            updateData.fertilizerLicense = uploaded;
-          }
-        } catch (error) {
-          console.error("Fertilizer License error:", error.message);
-        }
-      }
-
-      // procurement License - single
-      if (req.body.procurementLicense) {
-        const processBase64 = async (base64String) => {
-          const base64Data = base64String.split(",")[1];
-          const mimeType = base64String.split(";")[0].split(":")[1];
-          const extension = mimeType.split("/")[1];
-          const buffer = Buffer.from(base64Data, "base64");
-          const fileName = `procurementLicense_${Date.now()}.${extension}`;
-
-          return await uploadToS3(
-            {
-              buffer,
-              originalname: fileName,
-              mimetype: mimeType,
-              size: buffer.length,
-              fieldname: "procurementLicense",
-            },
-            userId,
-          );
-        };
-
-        try {
-          if (req.body.procurementLicense.startsWith("data:")) {
-            const uploaded = await processBase64(req.body.procurementLicense);
-            if (user.procurementLicense?.key) await deleteFromS3(user.procurementLicense.key);
-            updateData.procurementLicense = uploaded;
-          }
-        } catch (error) {
-          console.error("Procurement License error:", error.message);
-        }
-      }
-
-      // GST Certificate - single
-      if (req.body.GSTCertificate) {
-        const processBase64 = async (base64String) => {
-          const base64Data = base64String.split(",")[1];
-          const mimeType = base64String.split(";")[0].split(":")[1];
-          const extension = mimeType.split("/")[1];
-          const buffer = Buffer.from(base64Data, "base64");
-          const fileName = `GSTCertificate_${Date.now()}.${extension}`;
-
-          return await uploadToS3(
-            {
-              buffer,
-              originalname: fileName,
-              mimetype: mimeType,
-              size: buffer.length,
-              fieldname: "GSTCertificate",
-            },
-            userId,
-          );
-        };
-
-        try {
-          if (req.body.GSTCertificate.startsWith("data:")) {
-            const uploaded = await processBase64(req.body.GSTCertificate);
-            if (user.GSTCertificate?.key) await deleteFromS3(user.GSTCertificate.key);
-            updateData.GSTCertificate = uploaded;
-          }
-        } catch (error) {
-          console.error("GST Certificate error:", error.message);
-        }
-      }
-    }
+    // Merge all document updates into updateData
+    Object.assign(updateData, documentUpdates);
 
     let updatedUser;
 

@@ -193,6 +193,30 @@ const fpoSchema = new mongoose.Schema({
     type: s3FileSchema, // PDF
     default: null,
   },
+  CINCertificate: {
+    type: s3FileSchema, // PDF
+    default: null,
+  },
+  PANCard: {
+    type: s3FileSchema, // PDF
+    default: null,
+  },
+  InsecticidesLicense: {
+    type: s3FileSchema, // PDF
+    default: null,
+  },
+  CEODocuments: [{
+    type: s3FileSchema, // PDF
+    default: null,
+  }],
+  BODDocuments: [{
+    type: s3FileSchema, // PDF
+    default: null,
+  }],
+  FinancialDocuments: [{
+    type: s3FileSchema, // PDF
+    default: null,
+  }],
 });
 
 export const FPO = User.discriminator("FPO", fpoSchema);

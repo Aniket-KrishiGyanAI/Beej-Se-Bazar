@@ -1,0 +1,96 @@
+export const DOCUMENT_CONFIG = {
+  seedLicense: {
+    role: "FPO",
+    isArray: false,
+    folder: "seed-licenses",
+    scope: "private",
+    updateMode: "replace",
+  },
+  fertilizerLicense: {
+    role: "FPO",
+    isArray: false,
+    folder: "fertilizer-licenses",
+    scope: "private",
+    updateMode: "replace",
+  },
+  procurementLicense: {
+    role: "FPO",
+    isArray: false,
+    folder: "procurement-licenses",
+    scope: "private",
+    updateMode: "replace",
+  },
+  GSTCertificate: {
+    role: "FPO",
+    isArray: false,
+    folder: "gst-certificates",
+    scope: "private",
+    updateMode: "replace",
+  },
+  CINCertificate: {
+    role: "FPO",
+    isArray: false,
+    folder: "cin-certificates",
+    scope: "private",
+    updateMode: "replace",
+  },
+  PANCard: {
+    role: "FPO",
+    isArray: false,
+    folder: "pancard",
+    scope: "private",
+    updateMode: "replace",
+  },
+  InsecticidesLicense: {
+    role: "FPO",
+    isArray: false,
+    folder: "insecticides-licenses",
+    scope: "private",
+    updateMode: "replace",
+  },
+
+  CEODocuments: {
+    role: "FPO",
+    isArray: true,
+    folder: "ceo-documents",
+    scope: "private",
+    updateMode: "append",
+  },
+  BODDocuments: {
+    role: "FPO",
+    isArray: true,
+    folder: "bod-documents",
+    scope: "private",
+    updateMode: "append",
+  },
+  FinancialDocuments: {
+    role: "FPO",
+    isArray: true,
+    folder: "financial-documents",
+    scope: "private",
+    updateMode: "append",
+  },
+
+  // Farmer Documents
+  soilHealthCard: {
+    role: "Farmer",
+    isArray: false,
+    folder: "soil-health",
+    scope: "private",
+    updateMode: "replace",
+  },
+  labReport: {
+    role: "Farmer",
+    isArray: false,
+    folder: "lab-reports",
+    scope: "private",
+    updateMode: "replace",
+  },
+  govtSchemeDocs: {
+    role: "Farmer",
+    isArray: true,
+    folder: "govt-schemes",
+    scope: "private",
+    updateMode: "append",
+  },
+};
