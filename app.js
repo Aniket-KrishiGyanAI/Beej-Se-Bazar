@@ -41,7 +41,7 @@ app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
 app.get("/", (req, res) => {
-  res.send("Welcome to Marjeevi FPO 🚀");
+  res.send("Welcome to Beej Se Bazar FPO 🚀");
 });
 
 app.get('/health', (req, res) => {
