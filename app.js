@@ -27,6 +27,7 @@ import cropCaledarRoute from "./routes/cropCalendar.route.js";
 import paymentRoute from "./routes/payment.route.js";
 import mandiPrices from "./routes/mandiPrice.route.js";
 import khataRoutes from "./routes/khata.route.js";
+import hardwareProductRoutes from "./routes/hardwareProduct.route.js";
 
 const app = express();
 
@@ -80,5 +81,6 @@ app.use("/api/crop-calendar", cropCaledarRoute);
 app.use("/api/payment", paymentRoute);
 app.use("/api/mandi", mandiPrices);
 app.use("/api/khata", khataRoutes);
+app.use("/api/hardware-products", hardwareProductRoutes);
 
 export default app;
