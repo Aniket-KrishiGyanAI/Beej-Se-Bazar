@@ -47,6 +47,12 @@ export const getS3UploadPath = (fieldname) => {
     case "posterImages":
       return { scope: "public", folder: "posters" };
 
+    case "hardwareProductImages":
+      return { scope: "public", folder: "hardware-products" };
+
+    case "hardwareProductVideos":
+      return { scope: "public", folder: "hardware-products" };
+
     default:
       return { scope: "private", folder: "others" };
   }

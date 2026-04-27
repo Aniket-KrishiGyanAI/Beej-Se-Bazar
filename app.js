@@ -26,6 +26,7 @@ import advertisementPosterRoute from "./routes/advertisementPoster.route.js";
 import cropCaledarRoute from "./routes/cropCalendar.route.js";
 import paymentRoute from "./routes/payment.route.js";
 import mandiPrices from "./routes/mandiPrice.route.js";
+import khataRoutes from "./routes/khata.route.js";
 
 const app = express();
 
@@ -78,5 +79,6 @@ app.use("/api/advertisement-posters", advertisementPosterRoute);
 app.use("/api/crop-calendar", cropCaledarRoute);
 app.use("/api/payment", paymentRoute);
 app.use("/api/mandi", mandiPrices);
+app.use("/api/khata", khataRoutes);
 
 export default app;

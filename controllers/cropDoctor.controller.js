@@ -1,6 +1,69 @@
 import { CropDoctor } from "../models/cropDoctor.model.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
 import { deleteFromS3 } from "../utils/s3Delete.js";
+import { GoogleGenAI } from "@google/genai";
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  console.error("GEMINI_API_KEY is not set in server environment variables!");
+}
+
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+const getDynamicPrompt = (langCode) => {
+  const langMap = {
+    en: "English",
+    hi: "Hindi",
+    mr: "Marathi",
+    te: "Telugu",
+    gu: "Gujarati",
+    bn: "Bengali",
+    as: "Assamese",
+    mni: "Manipuri",
+    kn: "Kannada",
+    ta: "Tamil",
+    pa: "Punjabi",
+    ml: "Malayalam",
+  };
+
+  const targetLanguage = langMap[langCode] || "English";
+
+  return `Analyze this crop leaf image and identify any disease. You MUST provide the complete response EXCLUSIVELY in ${targetLanguage}. Do not use English unless the technical word has no translation. Format your response exactly in this plain text template without using markdown (no **, #, etc.):
+
+DISEASE NAME:
+[Determine the disease name]
+
+SYMPTOMS:
+[Symptom 1]
+[Symptom 2]
+[Symptom 3]
+
+CAUSES:
+[Explain what causes this disease]
+
+TREATMENT:
+[Treatment step 1]
+[Treatment step 2]
+[Treatment step 3]
+
+RECOMMENDED CHEMICALS:
+[Chemical/Fungicide/Pesticide name] - [Dosage and application]
+[Chemical/Fungicide/Pesticide name] - [Dosage and application]
+
+RECOMMENDED FERTILIZERS:
+[Fertilizer name] - [NPK and application]
+
+ORGANIC ALTERNATIVES:
+[Organic solution 1]
+[Organic solution 2]
+
+PREVENTION:
+[Prevention tip 1]
+[Prevention tip 2]
+
+Keep it simple, actionable, and STRICTLY in ${targetLanguage}. Provide specific chemical brands commonly available in India with exact dosages.`;
+};
 
 // save report
 const saveReport = async (req, res) => {
@@ -169,4 +232,62 @@ const deleteReport = async (req, res) => {
   }
 };
 
-export { saveReport, getReports, getReportById, deleteReport };
+// analyze crop image
+const analyzeCrop = async (req, res) => {
+  try {
+    // Validate input
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ status: "error", message: "No image file provided" });
+    }
+
+    const lang = req.body.lang || "en";
+
+    // Convert uploaded file buffer to base64
+    const base64Image = req.file.buffer.toString("base64");
+    const mimeType = req.file.mimetype || "image/jpeg";
+
+    // Build Gemini API request
+    const contents = [
+      { inlineData: { data: base64Image, mimeType } },
+      { text: getDynamicPrompt(lang) },
+    ];
+
+    // Call Gemini API
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents,
+    });
+
+    const resultText =
+      typeof response.text === "function" ? response.text() : response.text;
+
+    if (!resultText) {
+      return res
+        .status(500)
+        .json({ status: "error", message: "No diagnosis generated" });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      diagnosis: resultText,
+    });
+  } catch (error) {
+    console.error("Crop Doctor Analyze Error:", error.message);
+
+    if (error.message?.includes("429")) {
+      return res.status(429).json({
+        status: "error",
+        message: "Rate limit reached. Please try again later.",
+      });
+    }
+
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to analyze the image. Please try again.",
+    });
+  }
+};
+
+export { saveReport, getReports, getReportById, deleteReport, analyzeCrop };

@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  analyzeCrop,
   deleteReport,
   getReportById,
   getReports,
@@ -19,5 +20,6 @@ router.post(
 router.get("/getUserReports/:userId", getReports);
 router.get("/getReportById/:reportId", getReportById);
 router.delete("/deleteReport/:reportId", deleteReport);
+router.post("/analyze", upload.single("diagnosisImage"), analyzeCrop);
 
 export default router;
