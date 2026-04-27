@@ -6,9 +6,11 @@ import {
     getAllProducts,
     getProductById,
     getProducts,
+    reuploadMedia,
     updateProduct,
 } from "../controllers/hardwareProduct.controller.js";
 import { upload } from "../middlewares/multer.js";
+import { protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -43,3 +45,5 @@ router.put(
     reuploadMedia
 );
 router.post("/deleteProductById", deleteProductById);
+
+export default router;
