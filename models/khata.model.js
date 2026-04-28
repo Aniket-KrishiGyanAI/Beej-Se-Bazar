@@ -16,11 +16,11 @@ const incomeSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: ["Crop Sale", "Dairy", "Labour", "Government Subsidy", "Other"],
+      enum: ["Crop Sale", "Dairy", "Government Subsidy", "Other"],
     },
     productType: {
       type: String,
-      required: true,
+      default: "",
     },
     date: {
       type: Date,
@@ -28,16 +28,14 @@ const incomeSchema = new mongoose.Schema(
     },
     totalProduce: {
       type: Number,
-      required: true,
       min: 0,
     },
     unit: {
       type: String,
-      required: true,
       enum: ["KG", "Quintal", "Ton", "Litre", "Dozen", "Piece"],
       default: "KG",
     },
-    saleValue: {
+    amount: {
       type: Number,
       required: true,
       min: 0,
@@ -79,7 +77,7 @@ const expenseSchema = new mongoose.Schema(
     },
     productType: {
       type: String,
-      required: true,
+      default: "",
     },
     date: {
       type: Date,

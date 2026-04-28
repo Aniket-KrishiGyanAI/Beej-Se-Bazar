@@ -14,25 +14,25 @@ const addIncome = async (req, res) => {
       date,
       totalProduce,
       unit,
-      saleValue,
+      amount,
       reference,
     } = req.body;
 
-    if (!userId || !category || !productType || !date || !totalProduce || !unit || !saleValue) {
+    if (!userId || !category || !date || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing required fields (userId, category, date, amount)",
       });
     }
 
     const income = new Income({
       userId,
       category,
-      productType,
+      productType: productType || "",
       date,
-      totalProduce,
-      unit,
-      saleValue,
+      totalProduce: totalProduce || 0,
+      unit: unit || "KG",
+      amount,
       reference: reference || "",
     });
 
@@ -108,24 +108,24 @@ const updateIncome = async (req, res) => {
       date,
       totalProduce,
       unit,
-      saleValue,
+      amount,
       reference,
     } = req.body;
 
-    if (!category || !productType || !date || !totalProduce || !unit || !saleValue) {
+    if (!category || !date || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing required fields (category, date, amount)",
       });
     }
 
     const updatedIncome = await Income.findByIdAndUpdate(id, {
       category,
-      productType,
+      productType: productType || "",
       date,
-      totalProduce,
-      unit,
-      saleValue,
+      totalProduce: totalProduce || 0,
+      unit: unit || "KG",
+      amount,
       reference: reference || "",
     }, {
       new: true,
@@ -211,17 +211,17 @@ const addExpense = async (req, res) => {
       reference,
     } = req.body;
 
-    if (!userId || !category || !productType || !date || !amount) {
+    if (!userId || !category || !date || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing required fields (userId, category, date, amount)",
       });
     }
 
     const expense = new Expense({
       userId,
       category,
-      productType,
+      productType: productType || "",
       date,
       amount,
       reference: reference || "",
@@ -299,16 +299,16 @@ const updateExpense = async (req, res) => {
       reference,
     } = req.body;
 
-    if (!category || !productType || !date || !amount) {
+    if (!category || !date || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing required fields (category, date, amount)",
       });
     }
 
     const updatedExpense = await Expense.findByIdAndUpdate(id, {
       category,
-      productType,
+      productType: productType || "",
       date,
       amount,
       reference: reference || "",
@@ -398,7 +398,7 @@ const getKhataSummary = async (req, res) => {
     const [incomeResult, expenseResult] = await Promise.all([
       Income.aggregate([
         { $match: { userId: objectUserId } },
-        { $group: { _id: null, totalIncome: { $sum: "$saleValue" } } },
+        { $group: { _id: null, totalIncome: { $sum: "$amount" } } },
       ]),
       Expense.aggregate([
         { $match: { userId: objectUserId } },
@@ -443,11 +443,14 @@ const getLedgerDetails = async (req, res) => {
         .json({ success: false, message: "Missing userId" });
     }
 
+    const objectUserId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
     // Build date filter
     const dateFilter = {};
-    if (startDate) dateFilter.$gte = new Date(startDate);
-    if (endDate) {
-      // Set end date to end of day
+    if (startDate && !isNaN(new Date(startDate))) dateFilter.$gte = new Date(startDate);
+    if (endDate && !isNaN(new Date(endDate))) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       dateFilter.$lte = end;
@@ -456,8 +459,8 @@ const getLedgerDetails = async (req, res) => {
     const dateQuery = Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {};
 
     const [incomes, expenses] = await Promise.all([
-      Income.find({ userId, ...dateQuery }).sort({ date: -1 }).lean(),
-      Expense.find({ userId, ...dateQuery }).sort({ date: -1 }).lean(),
+      Income.find({ userId: objectUserId, ...dateQuery }).sort({ date: -1 }).lean(),
+      Expense.find({ userId: objectUserId, ...dateQuery }).sort({ date: -1 }).lean(),
     ]);
 
     // Merge and sort all entries by date (descending)
@@ -467,8 +470,8 @@ const getLedgerDetails = async (req, res) => {
     ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // Compute totals for the filtered range
-    const totalIncome = incomes.reduce((sum, i) => sum + i.saleValue, 0);
-    const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalIncome = incomes.reduce((sum, i) => sum + (i.amount || 0), 0);
+    const totalExpense = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
     res.status(200).json({
       success: true,
@@ -552,10 +555,14 @@ const getLedgerPDFData = async (req, res) => {
         .json({ success: false, message: "Missing userId" });
     }
 
+    const objectUserId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
     // Build date filter
     const dateFilter = {};
-    if (startDate) dateFilter.$gte = new Date(startDate);
-    if (endDate) {
+    if (startDate && !isNaN(new Date(startDate))) dateFilter.$gte = new Date(startDate);
+    if (endDate && !isNaN(new Date(endDate))) {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
       dateFilter.$lte = end;
@@ -564,12 +571,12 @@ const getLedgerPDFData = async (req, res) => {
     const dateQuery = Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {};
 
     const [incomes, expenses] = await Promise.all([
-      Income.find({ userId, ...dateQuery }).sort({ date: 1 }).lean(),
-      Expense.find({ userId, ...dateQuery }).sort({ date: 1 }).lean(),
+      Income.find({ userId: objectUserId, ...dateQuery }).sort({ date: 1 }).lean(),
+      Expense.find({ userId: objectUserId, ...dateQuery }).sort({ date: 1 }).lean(),
     ]);
 
-    const totalIncome = incomes.reduce((sum, i) => sum + i.saleValue, 0);
-    const totalExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalIncome = incomes.reduce((sum, i) => sum + (i.amount || 0), 0);
+    const totalExpense = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const totalProfit = totalIncome - totalExpense;
 
     // Date range label
@@ -627,7 +634,7 @@ const getLedgerPDFData = async (req, res) => {
     y += 22;
 
     const incomeColWidths = [75, 90, 90, 70, 45, 80, 65];
-    const incomeHeaders = ["Date", "Category", "Product", "Produce", "Unit", "Sale Value", "Ref"];
+    const incomeHeaders = ["Date", "Category", "Product", "Produce", "Unit", "Amount", "Ref"];
 
     y = drawTableRow(doc, y, incomeHeaders, incomeColWidths, {
       bold: true,
@@ -653,10 +660,10 @@ const getLedgerPDFData = async (req, res) => {
           [
             formatDate(entry.date),
             entry.category,
-            entry.productType,
-            entry.totalProduce,
-            entry.unit,
-            formatCurrency(entry.saleValue),
+            entry.productType || "-",
+            (entry.totalProduce !== undefined && entry.totalProduce !== null) ? entry.totalProduce : "-",
+            entry.unit || "-",
+            formatCurrency(entry.amount || 0),
             entry.reference || "-",
           ],
           incomeColWidths,
@@ -705,8 +712,8 @@ const getLedgerPDFData = async (req, res) => {
           [
             formatDate(entry.date),
             entry.category,
-            entry.productType,
-            formatCurrency(entry.amount),
+            entry.productType || "-",
+            formatCurrency(entry.amount || 0),
             entry.reference || "-",
           ],
           expenseColWidths,
